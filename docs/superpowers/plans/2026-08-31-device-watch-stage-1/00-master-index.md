@@ -6,7 +6,7 @@ This decomposition preserves the approved design in [the Stage 1 specification](
 
 | Step | Name | Depends on | Status |
 | --- | --- | --- | --- |
-| 01 | Repository bootstrap and dependency locks | None | Blocked |
+| 01 | Repository bootstrap and dependency locks | None | Complete |
 | 02 | Server settings and configuration validation | 01 | Pending |
 | 03 | SQLAlchemy engine and verified MySQL TLS boundary | 02 | Pending |
 | 04 | Development MySQL service foundation | 01 | Pending |
@@ -47,7 +47,7 @@ Before this decomposition, the repository contained only the approved Stage 1 sp
 
 ## Recommended Next Step
 
-Step 01 has been attempted but is blocked on generating the required Python locks because `uv` is not available to the active terminal environment. Resume Step 01 only to generate and verify both locks; after it is complete, execute [Step 02: Server settings and configuration validation](02-server-settings.md) in a separate session. Do not begin Step 02 until Step 01 is complete.
+Execute [Step 02: Server settings and configuration validation](02-server-settings.md) next, in a separate session. Do not begin any later step in the same session.
 
 ## Planning Risks
 
