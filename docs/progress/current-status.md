@@ -138,12 +138,45 @@ Important evidence:
 
 Unresolved issues: Docker/Compose runtime startup itself could not be executed here because the CLI is unavailable. The topology and render contract for Step 04 are still verified by the unit-style topology test.
 
+## Step 05 Completion
+
+Status: **Complete**.
+
+Implemented the FastAPI application factory and the two approved health endpoints without introducing later-step behavior or database-specific domains.
+
+Files created or modified:
+
+- `server/src/device_watch_server/api/__init__.py`
+- `server/src/device_watch_server/api/health.py`
+- `server/src/device_watch_server/api/router.py`
+- `server/src/device_watch_server/app.py`
+- `server/src/device_watch_server/db/health.py`
+- `server/src/device_watch_server/main.py`
+- `server/tests/unit/test_app.py`
+- `docs/progress/current-status.md`
+- `docs/superpowers/plans/2026-08-31-device-watch-stage-1/00-master-index.md`
+
+Verification executed:
+
+- `uv run --project server --group test pytest tests/unit/test_app.py -q`: passed, 6 tests.
+- `uv run --project server --group test ruff check src tests/unit/test_app.py`: passed.
+- `uv run --project server --group test mypy src`: passed, no issues.
+
+Important evidence:
+
+- Only `/api/v1/health/live` and `/api/v1/health/ready` are registered.
+- Liveness is process-only; readiness invokes the injected database-check callback and returns a generic `503` without exposing exception details or credentials.
+- The app owns its internal engine during lifespan shutdown and disposes it before exit.
+- Production disables OpenAPI docs unless explicitly enabled through settings.
+
+Unresolved issues: none for Step 05. Step 06 remains out of scope and was not started.
+
 ## Current Recommendation
 
-The next coding session must remain strictly at Step 05 only if the user explicitly requests it after Step 04's verification; this session did not start any later step.
+The next coding session must remain strictly at Step 06 only if the user explicitly requests it after Step 05's verification; this session did not start any later step.
 
 ## Step Status
 
-Steps 01, 02, 03, and 04 are Complete. Steps 05 through 17 remain Pending. No implementation beyond Step 04 has started.
+Steps 01, 02, 03, 04, and 05 are Complete. Steps 06 through 17 remain Pending. No implementation beyond Step 05 has started.
 
 At each handoff, record the completed step, files changed, commands and results, environment limitations, commit identifier, and the next permitted step here. Do not mark a step complete based only on planned work.

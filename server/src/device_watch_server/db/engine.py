@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from sqlalchemy import create_engine
-from sqlalchemy.engine import URL, make_url
+from sqlalchemy.engine import URL, Engine, make_url
 
 from device_watch_server.core.config import (
     PRODUCTION_TLS_QUERY,
@@ -38,7 +38,7 @@ def database_engine_url(settings: Settings) -> URL:
     return url.set(query=query)
 
 
-def create_database_engine(settings: Settings):
+def create_database_engine(settings: Settings) -> Engine:
     """Create and configure the server's SQLAlchemy engine."""
 
     return create_engine(
