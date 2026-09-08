@@ -1,0 +1,75 @@
+services:
+  caddy:
+    image: device-watch-caddy:stage1
+    build:
+      context: ..
+      dockerfile: deploy/caddy/Dockerfile
+    restart: unless-stopped
+    environment:
+      DEVICE_WATCH_DOMAIN: ${DEVICE_WATCH_DOMAIN:?DEVICE_WATCH_DOMAIN is required}
+    ports:
+      - "80:80"
+      - "443:443"
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    tmpfs:
+      - /tmp
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    healthcheck:
+      test: ["CMD", "caddy", "validate", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      - device_watch_prod
+
+  server:
+    image: device-watch-server:stage1
+    build:
+      context: ..
+      dockerfile: server/Dockerfile
+    restart: unless-stopped
+    environment:
+      DEVICE_WATCH_ENV: production
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+    expose:
+      - "8000"
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    secrets:
+      - source: mysql_ca
+        target: mysql-ca.pem
+        mode: 0444
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health/ready', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      - device_watch_prod
+
+networks:
+  device_watch_prod:
+    driver: bridge
+
+volumes:
+  caddy_data:
+  caddy_config:
+
+secrets:
+  mysql_ca:
+    file: ${MYSQL_CA_CERT_PATH:?MYSQL_CA_CERT_PATH is required}

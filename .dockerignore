@@ -9,6 +9,7 @@
 !server/alembic/
 !server/alembic/**
 !server/alembic.ini
+!server/Dockerfile
 
 !web/
 !web/package.json
@@ -25,3 +26,4 @@
 !deploy/
 !deploy/caddy/
 !deploy/caddy/Caddyfile
+!deploy/caddy/Dockerfile

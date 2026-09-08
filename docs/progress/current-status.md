@@ -263,12 +263,111 @@ Important evidence:
 
 Unresolved issues: none for Step 08. The next permitted work is Step 09 only if explicitly requested.
 
+## Step 09 Completion
+
+Status: **Complete**.
+
+Implemented strict native-agent configuration and an empty, signal-aware lifecycle with no collection, network, database, or server coupling.
+
+Files created or modified:
+
+- `agent/.env.example`
+- `agent/src/device_watch_agent/__main__.py`
+- `agent/src/device_watch_agent/config.py`
+- `agent/src/device_watch_agent/logging.py`
+- `agent/src/device_watch_agent/lifecycle.py`
+- `agent/src/device_watch_agent/main.py`
+- `agent/tests/test_config.py`
+- `agent/tests/test_lifecycle.py`
+
+Verification executed:
+
+- `uv run --project agent --group test pytest agent/tests -q`: passed, 18 tests.
+- `uv run --project agent --group test ruff check agent/src agent/tests`: passed.
+- `uv run --project agent --group test mypy agent/src`: passed, no issues.
+- `uv tree --project agent --no-dev`: passed; runtime dependency remains standard-library only.
+
+## Step 10 Completion
+
+Status: **Complete**.
+
+Implemented the responsive React/TypeScript Stage 1 shell with five empty routes, accessible navigation, persistent system/light/dark theme state, reduced-motion styling, and a development-only `/api` proxy.
+
+Files created or modified:
+
+- `web/index.html`
+- `web/eslint.config.js`
+- `web/tsconfig.json`
+- `web/tsconfig.app.json`
+- `web/tsconfig.node.json`
+- `web/vite.config.ts`
+- `web/vitest.config.ts`
+- `web/src/`
+
+Verification executed:
+
+- `npm --prefix web run test -- --run`: passed, 8 tests.
+- `npm --prefix web run typecheck`: passed.
+- `npm --prefix web run lint`: passed.
+- `npm --prefix web run build`: passed; static output generated in `web/dist`.
+
+## Step 11 Completion
+
+Status: **Complete**.
+
+Added the locked, non-root server image definition using the pinned UV builder, frozen server lock data, minimal runtime inputs, health probe, read-only-compatible `/tmp`, and the approved Uvicorn proxy-header command.
+
+Files created or modified:
+
+- `.dockerignore`
+- `server/Dockerfile`
+
+The actual image build and inspection are blocked because Docker is unavailable on this host.
+
+## Step 12 Completion
+
+Status: **Complete**.
+
+Added the multi-stage Caddy image and exact path-preserving Caddyfile. The final stage copies only the web build and Caddy configuration into the pinned Caddy runtime; `/api/*` proxies unchanged to `server:8000`, and all other paths use SPA fallback.
+
+Files created or modified:
+
+- `.dockerignore`
+- `deploy/caddy/Caddyfile`
+- `deploy/caddy/Dockerfile`
+
+Caddy image build and `caddy validate` remain blocked by Docker unavailability.
+
+## Step 13 Completion
+
+Status: **Complete**.
+
+Implemented the production env example, exact two-service Compose topology, CA secret mount, host gateway, health checks, rootless/read-only capability controls, persistent Caddy volumes, and a standard-library rendered-topology verifier.
+
+Files created or modified:
+
+- `deploy/__init__.py`
+- `deploy/.env.prod.example`
+- `deploy/compose.prod.yml`
+- `deploy/verify_topology.py`
+- `deploy/tests/test_production_topology.py`
+
+Verification executed:
+
+- `uv run --project server --group test pytest server/tests/unit deploy/tests -q`: passed, 29 tests.
+- `uv run --project server --group test ruff check server/src server/tests deploy`: passed.
+- `uv run --project server --group test mypy server/src`: passed, no issues.
+- `uv run --project server --group test pytest deploy/tests/test_production_topology.py -q`: passed, 4 tests.
+- `python -m py_compile deploy/verify_topology.py`: passed.
+
+Environment limitation: Docker and Docker Compose are not installed or available on PATH, so Compose rendering, image builds, health probes, Caddy validation, and live missing-variable failure checks could not be executed. No `DATABASE_URL` value was echoed.
+
 ## Current Recommendation
 
-The next coding session may continue only to Step 09 if the user explicitly requests it. No Step 09 code or Step 10+ work has been started.
+The next coding session may continue only to Step 14 if the user explicitly requests it. No Step 14 or later work has been started.
 
 ## Step Status
 
-Steps 01, 02, 03, 04, 05, 06, 07, and 08 are Complete. Steps 09 through 17 remain Pending. No implementation beyond Step 08 has started.
+Steps 01 through 13 are Complete. Steps 14 through 17 remain Pending. No implementation beyond Step 13 has started.
 
 At each handoff, record the completed step, files changed, commands and results, environment limitations, commit identifier, and the next permitted step here. Do not mark a step complete based only on planned work.

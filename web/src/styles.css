@@ -1,0 +1,45 @@
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Space+Mono&display=swap");
+
+:root {
+  color-scheme: light;
+  font-family: "DM Sans", sans-serif;
+  --background: #f3f0e8;
+  --surface: #fffdf8;
+  --text: #182126;
+  --muted: #637078;
+  --border: #d7d3c7;
+  --accent: #e36b35;
+  --accent-ink: #632510;
+  --focus: #176b87;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --background: #182126;
+  --surface: #202d32;
+  --text: #f4f0e6;
+  --muted: #b2c0c0;
+  --border: #405057;
+  --accent: #f08b58;
+  --accent-ink: #25140c;
+  --focus: #6fc5df;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; background: var(--background); color: var(--text); }
+button, a { font: inherit; }
+button:focus-visible, a:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+.app-shell { min-height: 100vh; max-width: 1180px; margin: 0 auto; padding: 28px clamp(20px, 5vw, 72px) 64px; }
+.app-header { display: flex; align-items: end; justify-content: space-between; gap: 24px; padding-bottom: 28px; border-bottom: 1px solid var(--border); }
+.brand-kicker, .eyebrow { margin: 0 0 8px; color: var(--accent); font: 500 0.72rem/1 "Space Mono", monospace; letter-spacing: 0.08em; text-transform: uppercase; }
+.brand { font-size: clamp(1.8rem, 5vw, 3rem); font-weight: 700; letter-spacing: 0; }
+.theme-button { border: 1px solid var(--border); border-radius: 4px; background: var(--surface); color: var(--text); padding: 10px 14px; cursor: pointer; }
+.theme-button:hover { border-color: var(--accent); }
+.navigation-list { display: flex; flex-wrap: wrap; gap: 8px 24px; margin: 22px 0 0; padding: 0; list-style: none; }
+.navigation-list a { display: inline-block; padding: 8px 0; color: var(--muted); text-decoration: none; border-bottom: 2px solid transparent; }
+.navigation-list a:hover, .navigation-list a.active { color: var(--text); border-color: var(--accent); }
+.foundation-page { max-width: 720px; padding: clamp(72px, 14vh, 150px) 0; }
+.foundation-page h1 { margin: 0 0 18px; font-size: clamp(2.5rem, 8vw, 5.5rem); line-height: 0.98; letter-spacing: 0; }
+.foundation-page p:last-child { margin: 0; color: var(--muted); font-size: 1.1rem; }
+@media (max-width: 560px) { .app-header { align-items: start; flex-direction: column; } .theme-button { align-self: stretch; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; } }
