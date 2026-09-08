@@ -7,7 +7,7 @@ This decomposition preserves the approved design in [the Stage 1 specification](
 | Step | Name | Depends on | Status |
 | --- | --- | --- | --- |
 | 01 | Repository bootstrap and dependency locks | None | Complete |
-| 02 | Server settings and configuration validation | 01 | Pending |
+| 02 | Server settings and configuration validation | 01 | Complete |
 | 03 | SQLAlchemy engine and verified MySQL TLS boundary | 02 | Pending |
 | 04 | Development MySQL service foundation | 01 | Pending |
 | 05 | FastAPI factory and health endpoints | 02, 03 | Pending |
@@ -47,7 +47,7 @@ Before this decomposition, the repository contained only the approved Stage 1 sp
 
 ## Recommended Next Step
 
-Execute [Step 02: Server settings and configuration validation](02-server-settings.md) next, in a separate session. Do not begin any later step in the same session.
+Execute [Step 03: SQLAlchemy engine and verified MySQL TLS boundary](03-server-engine-tls.md) next, in a separate session. Do not begin any later step in the same session.
 
 ## Planning Risks
 

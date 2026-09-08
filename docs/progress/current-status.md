@@ -51,12 +51,41 @@ Decisions and deviations: the approved dependency versions were preserved. The V
 
 Unresolved issues: Docker and Compose remain unavailable, so their version checks were not run; they are not required for the Step 01 definition of done. The host Node version is below React Router's declared engine minimum and should be upgraded before web execution in a later step.
 
+## Step 02 Completion
+
+Status: **Complete**.
+
+Implemented strict server settings and secret-safe validation without creating an engine, database connection, API route, or later-step runtime behavior.
+
+Files created or modified:
+
+- `server/src/device_watch_server/__init__.py`
+- `server/src/device_watch_server/core/__init__.py`
+- `server/src/device_watch_server/core/config.py`
+- `server/tests/conftest.py`
+- `server/tests/unit/test_config.py`
+- `docs/superpowers/plans/2026-08-31-device-watch-stage-1/00-master-index.md`
+- `docs/progress/current-status.md`
+
+Verification executed:
+
+- `uv run --project server --group test pytest server/tests/unit/test_config.py -q`: passed, 10 tests.
+- `uv run --project server --group test ruff check server/src server/tests/unit/test_config.py`: passed.
+- `uv run --project server --group test mypy server/src`: passed, no issues.
+- Final `git diff --check`: pending final handoff review.
+
+The tests cover required environment variables, exactly three supported modes, the `mysql+pymysql` dialect, immutable settings, credential-safe representations/errors, exact production TLS query entries, duplicate/additional query rejection, production documentation rejection, and development TLS omission. No Docker or MySQL verification was required for this step.
+
+Important decision: `load_settings()` uses Pydantic Settings environment loading and converts validation failures to `SettingsError` messages without connection-string values. Production TLS query validation parses raw query pairs so duplicate keys cannot be silently collapsed.
+
+Unresolved issues: none for Step 02. The next step owns engine construction and effective PyMySQL TLS arguments.
+
 ## Current Recommendation
 
-The next coding session should execute Step 02 only: server settings and configuration validation.
+The next coding session should execute Step 03 only: SQLAlchemy engine and verified MySQL TLS boundary.
 
 ## Step Status
 
-Step 01 is Complete. Steps 02 through 17 remain Pending. Implementation beyond Step 01 has not started.
+Steps 01 and 02 are Complete. Steps 03 through 17 remain Pending. No implementation beyond Step 02 has started.
 
 At each handoff, record the completed step, files changed, commands and results, environment limitations, commit identifier, and the next permitted step here. Do not mark a step complete based only on planned work.
