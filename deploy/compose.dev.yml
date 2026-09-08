@@ -1,0 +1,32 @@
+services:
+  mysql:
+    image: mysql:8.4.11
+    container_name: device-watch-dev-mysql
+    restart: unless-stopped
+    env_file:
+      - .env.dev.example
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    ports:
+      - "127.0.0.1:3307:3306"
+    volumes:
+      - mysql_dev_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "--password=${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    networks:
+      - device_watch_dev
+
+networks:
+  device_watch_dev:
+    driver: bridge
+
+volumes:
+  mysql_dev_data:
+    name: mysql_dev_data

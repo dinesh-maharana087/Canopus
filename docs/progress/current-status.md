@@ -110,12 +110,40 @@ Important evidence:
 
 Unresolved issues: none for Step 03. Step 04 remains out of scope and was not started.
 
+## Step 04 Completion
+
+Status: **Complete**.
+
+Implemented the isolated development MySQL topology for later integration and migration checks without creating production Compose or server code.
+
+Files created or modified:
+
+- `deploy/.env.dev.example`
+- `deploy/compose.dev.yml`
+- `deploy/tests/test_development_mysql.py`
+- `docs/progress/current-status.md`
+- `docs/superpowers/plans/2026-08-31-device-watch-stage-1/00-master-index.md`
+
+Verification executed:
+
+- `uv run --project server --group test pytest deploy/tests/test_development_mysql.py -q`: passed, 1 test.
+- Docker/Compose availability check: blocked because Docker is not installed or not on PATH in this environment.
+
+Important evidence:
+
+- The development Compose definition contains exactly one service, `mysql`, using the required image `mysql:8.4.11`.
+- The service binds to `127.0.0.1:3307:3306`, uses a health check, and mounts the development-only named volume `mysql_dev_data`.
+- Sample credentials are non-production and sourced from the development env example file only.
+- No production Compose or server files were modified as part of Step 04.
+
+Unresolved issues: Docker/Compose runtime startup itself could not be executed here because the CLI is unavailable. The topology and render contract for Step 04 are still verified by the unit-style topology test.
+
 ## Current Recommendation
 
-The next coding session remains strictly at Step 04 only if the user explicitly requests it after Step 03's verification; this session did not start any later step.
+The next coding session must remain strictly at Step 05 only if the user explicitly requests it after Step 04's verification; this session did not start any later step.
 
 ## Step Status
 
-Steps 01, 02, and 03 are Complete. Steps 04 through 17 remain Pending. No implementation beyond Step 03 has started.
+Steps 01, 02, 03, and 04 are Complete. Steps 05 through 17 remain Pending. No implementation beyond Step 04 has started.
 
 At each handoff, record the completed step, files changed, commands and results, environment limitations, commit identifier, and the next permitted step here. Do not mark a step complete based only on planned work.
