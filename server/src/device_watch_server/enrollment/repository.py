@@ -48,6 +48,12 @@ def _as_utc(value: datetime) -> datetime:
     return value.astimezone(UTC)
 
 
+def _require_utc(value: datetime) -> datetime:
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise ValueError("timestamp must include a timezone")
+    return value.astimezone(UTC)
+
+
 def _record_from_row(row: RowMapping) -> BootstrapRecord:
     consumed_at = cast(datetime | None, row["consumed_at"])
     revoked_at = cast(datetime | None, row["revoked_at"])
@@ -73,10 +79,14 @@ def insert_bootstrap(connection: Connection, record: BootstrapRecord) -> None:
             digest_version=record.digest_version,
             digest=record.digest,
             operator_label=record.operator_label,
-            created_at=record.created_at,
-            expires_at=record.expires_at,
-            consumed_at=record.consumed_at,
-            revoked_at=record.revoked_at,
+            created_at=_require_utc(record.created_at),
+            expires_at=_require_utc(record.expires_at),
+            consumed_at=(
+                None if record.consumed_at is None else _require_utc(record.consumed_at)
+            ),
+            revoked_at=(
+                None if record.revoked_at is None else _require_utc(record.revoked_at)
+            ),
         )
     )
 
@@ -121,7 +131,7 @@ def consume_bootstrap(
             bootstrap_table.c.consumed_at.is_(None),
             bootstrap_table.c.revoked_at.is_(None),
         )
-        .values(consumed_at=consumed_at)
+        .values(consumed_at=_require_utc(consumed_at))
     )
     return result.rowcount == 1
 
@@ -137,7 +147,7 @@ def revoke_bootstrap(
             bootstrap_table.c.consumed_at.is_(None),
             bootstrap_table.c.revoked_at.is_(None),
         )
-        .values(revoked_at=revoked_at)
+        .values(revoked_at=_require_utc(revoked_at))
     )
     return result.rowcount == 1
 
