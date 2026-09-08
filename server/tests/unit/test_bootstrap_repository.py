@@ -208,6 +208,25 @@ def test_fingerprint_lookup_can_request_a_mysql_row_lock(connection: Connection)
     assert "for update" in compiled
 
 
+def test_id_lookup_can_request_a_mysql_row_lock(connection: Connection) -> None:
+    """Catch a revocation lookup that silently drops the requested row lock."""
+    insert_bootstrap(connection, make_record())
+    statements: list[ClauseElement] = []
+
+    def capture_statement(*args: object) -> None:
+        statements.append(cast(ClauseElement, args[1]))
+
+    event.listen(connection, "before_execute", capture_statement)
+    try:
+        found = lookup_bootstrap_by_id(connection, BOOTSTRAP_ID, for_update=True)
+    finally:
+        event.remove(connection, "before_execute", capture_statement)
+
+    assert found is not None
+    compiled = str(statements[-1].compile(dialect=mysql.dialect())).lower()
+    assert "for update" in compiled
+
+
 def test_duplicate_lookup_fingerprint_is_rejected(connection: Connection) -> None:
     """Catch removal of the unique lookup-fingerprint database constraint."""
     insert_bootstrap(connection, make_record())

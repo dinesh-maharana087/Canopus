@@ -9,5 +9,6 @@ def clear_server_environment(monkeypatch: pytest.MonkeyPatch) -> None:
         "DEVICE_WATCH_ENV",
         "DATABASE_URL",
         "DEVICE_WATCH_ENABLE_DOCS",
+        "DEVICE_WATCH_BOOTSTRAP_HMAC_PEPPER",
     ):
         monkeypatch.delenv(name, raising=False)

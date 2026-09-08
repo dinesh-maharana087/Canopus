@@ -37,11 +37,26 @@ class Settings(BaseSettings):
         env_prefix="",
         extra="forbid",
         frozen=True,
+        hide_input_in_errors=True,
     )
 
     device_watch_env: Environment
     database_url: SecretStr
     device_watch_enable_docs: bool = False
+    device_watch_bootstrap_hmac_pepper: SecretStr | None = None
+
+    @field_validator("device_watch_bootstrap_hmac_pepper")
+    @classmethod
+    def validate_bootstrap_hmac_pepper(
+        cls, value: SecretStr | None
+    ) -> SecretStr | None:
+        """Require enough UTF-8 entropy material whenever a pepper is configured."""
+
+        if value is not None and len(value.get_secret_value().encode("utf-8")) < 32:
+            raise ValueError(
+                "DEVICE_WATCH_BOOTSTRAP_HMAC_PEPPER must contain at least 32 UTF-8 bytes"
+            )
+        return value
 
     @field_validator("database_url")
     @classmethod

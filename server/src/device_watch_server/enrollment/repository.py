@@ -105,18 +105,15 @@ def lookup_bootstrap_by_fingerprint(
 
 
 def lookup_bootstrap_by_id(
-    connection: Connection, bootstrap_id: UUID
+    connection: Connection, bootstrap_id: UUID, *, for_update: bool = False
 ) -> BootstrapRecord | None:
-    """Look up a bootstrap by its non-secret operator-visible identifier."""
-    row = (
-        connection.execute(
-            select(bootstrap_table).where(
-                bootstrap_table.c.bootstrap_id == str(bootstrap_id)
-            )
-        )
-        .mappings()
-        .one_or_none()
+    """Look up by non-secret operator-visible ID, optionally locking the row."""
+    statement = select(bootstrap_table).where(
+        bootstrap_table.c.bootstrap_id == str(bootstrap_id)
     )
+    if for_update:
+        statement = statement.with_for_update()
+    row = connection.execute(statement).mappings().one_or_none()
     return None if row is None else _record_from_row(row)
 
 
