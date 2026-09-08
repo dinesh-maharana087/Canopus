@@ -80,12 +80,42 @@ Important decision: `load_settings()` uses Pydantic Settings environment loading
 
 Unresolved issues: none for Step 02. The next step owns engine construction and effective PyMySQL TLS arguments.
 
+## Step 03 Completion
+
+Status: **Complete**.
+
+Implemented the centralized SQLAlchemy engine boundary and verified the effective MySQL TLS arguments at the `do_connect` boundary without attempting a network connection.
+
+Files created or modified:
+
+- `server/src/device_watch_server/db/__init__.py`
+- `server/src/device_watch_server/db/engine.py`
+- `server/tests/unit/test_engine_tls.py`
+- `docs/progress/current-status.md`
+- `docs/superpowers/plans/2026-08-31-device-watch-stage-1/00-master-index.md`
+
+Verification executed:
+
+- `uv run --project server --group test pytest tests/unit/test_config.py tests/unit/test_engine_tls.py -q`: passed, 14 tests.
+- `uv run --project server --group test ruff check src tests/unit/test_config.py tests/unit/test_engine_tls.py`: passed.
+- `uv run --project server --group test mypy src`: passed, no issues.
+- `git diff --check`: not run in this session; the step-level verification above is the current evidence base.
+
+Important evidence:
+
+- SQLAlchemy package version is `2.0.52` and PyMySQL is `1.2.0`.
+- The upstream `MySQLDialect_pymysql().create_connect_args()` characterization shows the nested `ssl` mapping plus string verification flags, which the app boundary intentionally strips and re-asserts as a flat mapping: `ssl_ca`, `ssl_verify_cert=True`, `ssl_verify_identity=True`.
+- The engine removes the already-validated TLS query keys before SQLAlchemy URL translation so a competing nested `ssl` mapping is not created from the URL itself.
+- The `do_connect` event capture records final keyword arguments immediately before the database driver receives them; no network connection is attempted in the tests.
+
+Unresolved issues: none for Step 03. Step 04 remains out of scope and was not started.
+
 ## Current Recommendation
 
-The next coding session should execute Step 03 only: SQLAlchemy engine and verified MySQL TLS boundary.
+The next coding session remains strictly at Step 04 only if the user explicitly requests it after Step 03's verification; this session did not start any later step.
 
 ## Step Status
 
-Steps 01 and 02 are Complete. Steps 03 through 17 remain Pending. No implementation beyond Step 02 has started.
+Steps 01, 02, and 03 are Complete. Steps 04 through 17 remain Pending. No implementation beyond Step 03 has started.
 
 At each handoff, record the completed step, files changed, commands and results, environment limitations, commit identifier, and the next permitted step here. Do not mark a step complete based only on planned work.

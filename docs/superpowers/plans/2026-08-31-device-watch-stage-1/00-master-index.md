@@ -8,7 +8,7 @@ This decomposition preserves the approved design in [the Stage 1 specification](
 | --- | --- | --- | --- |
 | 01 | Repository bootstrap and dependency locks | None | Complete |
 | 02 | Server settings and configuration validation | 01 | Complete |
-| 03 | SQLAlchemy engine and verified MySQL TLS boundary | 02 | Pending |
+| 03 | SQLAlchemy engine and verified MySQL TLS boundary | 02 | Complete |
 | 04 | Development MySQL service foundation | 01 | Pending |
 | 05 | FastAPI factory and health endpoints | 02, 03 | Pending |
 | 06 | Server logging and database-check CLI | 05 | Pending |
