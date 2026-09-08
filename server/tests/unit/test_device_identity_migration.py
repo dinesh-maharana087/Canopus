@@ -24,7 +24,7 @@ def test_device_identity_revision_chain_and_offline_sql(
     assert revision is not None
     assert revision.down_revision == "20260831_0001"
 
-    command.upgrade(config, "head", sql=True)
+    command.upgrade(config, "20260908_0002", sql=True)
     output = capsys.readouterr().out.lower()
 
     assert "create table devices" in output
