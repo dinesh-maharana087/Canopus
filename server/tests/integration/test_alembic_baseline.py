@@ -31,7 +31,7 @@ def test_real_mysql_baseline_cycle() -> None:
         connection.execute(text("DROP TABLE IF EXISTS alembic_version"))
 
     alembic_cfg = Config("server/alembic.ini")
-    command.upgrade(alembic_cfg, "head")
+    command.upgrade(alembic_cfg, "20260831_0001")
 
     with engine.connect() as connection:
         current = connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
@@ -46,7 +46,7 @@ def test_real_mysql_baseline_cycle() -> None:
         assert tables == []
         assert connection.execute(text("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'alembic_version'")) .scalar() == 0
 
-    command.upgrade(alembic_cfg, "head")
+    command.upgrade(alembic_cfg, "20260831_0001")
     with engine.connect() as connection:
         current = connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
         assert current == "20260831_0001"

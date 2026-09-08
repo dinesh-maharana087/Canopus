@@ -125,14 +125,35 @@ class JSONFormatter(logging.Formatter):
         return json.dumps(payload, separators=(",", ":"), sort_keys=True)
 
 
+class CurrentStdoutHandler(logging.StreamHandler):
+    """Write to the current process stdout, including test capture streams."""
+
+    def emit(self, record: logging.LogRecord) -> None:
+        self.stream = sys.stdout
+        super().emit(record)
+
+
 def setup_logging() -> logging.Logger:
     """Configure a single JSON stdout logger for the server."""
 
     logger = logging.getLogger("device_watch_server")
     logger.setLevel(logging.INFO)
+    logger.disabled = False
     logger.propagate = False
-    if not any(isinstance(handler, logging.StreamHandler) and handler.stream is sys.stdout for handler in logger.handlers):
-        handler = logging.StreamHandler(sys.stdout)
+    stream_handlers = [
+        handler
+        for handler in logger.handlers
+        if isinstance(handler, logging.StreamHandler)
+    ]
+    if stream_handlers:
+        for handler in stream_handlers:
+            logger.removeHandler(handler)
+        handler = CurrentStdoutHandler(sys.stdout)
+        handler.setFormatter(JSONFormatter())
+        handler.terminator = ""
+        logger.addHandler(handler)
+    else:
+        handler = CurrentStdoutHandler(sys.stdout)
         handler.setFormatter(JSONFormatter())
         handler.terminator = ""
         logger.addHandler(handler)

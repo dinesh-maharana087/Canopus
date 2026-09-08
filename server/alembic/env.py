@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from logging.config import fileConfig
 
-from alembic import context
 from sqlalchemy import engine_from_config, pool
 
+from alembic import context
 from device_watch_server.core.config import load_settings
 from device_watch_server.db.base import Base
 

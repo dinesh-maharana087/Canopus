@@ -504,3 +504,42 @@ Verification executed:
 - `uv run --project server --group test mypy server/src`: passed, no issues.
 
 Stage 1 regression status: the Step 01 change touched only new Stage 2 domain/test files; completed Stage 1 verification remains preserved. The next permitted work is Step 02 only.
+
+## Stage 2 Step 02 Completion
+
+Status: **Complete**.
+
+Added the first Stage 2 Alembic revision for server-owned device identity. The migration is chained from the schema-empty Stage 1 revision and creates only the constrained `devices` identity table.
+
+Files created or modified:
+
+- `server/alembic/versions/20260908_0002_device_identity.py`
+- `server/alembic.ini`
+- `server/tests/unit/test_device_identity_migration.py`
+- `server/tests/integration/test_device_identity_migration.py`
+- `server/tests/integration/test_alembic_baseline.py`
+- `server/src/device_watch_server/core/logging.py`
+- `docs/progress/current-status.md`
+- `docs/superpowers/plans/2026-09-08-device-watch-stage-2/00-master-index.md`
+
+Migration decisions verified:
+
+- Revision `20260908_0002` revises `20260831_0001`.
+- `devices.device_id` is a non-null canonical UUID string column with the primary-key constraint `pk_devices`.
+- `display_name` is required and bounded at 120 characters; names are not globally unique.
+- `created_at` is required and server-owned; `lifecycle` is required with the `active`/`revoked` check constraint `ck_devices_lifecycle` and an `active` default.
+- No credentials, bootstrap material, heartbeat state, connectivity state, metrics, history, or UI fields are included.
+- Downgrade removes only `devices` and returns to the Stage 1 baseline.
+
+Verification executed:
+
+- `uv run --project server --group test pytest server/tests/unit -q`: passed, 32 tests.
+- `uv run --project server --group test pytest server/tests/unit/test_device_identity_migration.py -q`: passed, 1 offline SQL characterization test.
+- `uv run --project server --group test pytest server/tests/integration/test_alembic_baseline.py server/tests/integration/test_device_identity_migration.py -q`: 2 skipped because no `DATABASE_URL`/real MySQL was available.
+- `uv run --project server --group test ruff check server/src server/alembic server/tests`: passed.
+- `uv run --project server --group test mypy server/src`: passed, no issues.
+- `git diff --check`: passed.
+
+Adjacent regression repair: `setup_logging()` now re-enables the existing server logger and safely replaces stale stdout handlers so the completed Step 06 logging test remains stable across repeated app construction and pytest capture. Its JSON/redaction contract is unchanged; the full server unit suite passes.
+
+The next permitted work is Step 03 only. Step 03 has not been started.
