@@ -473,3 +473,34 @@ The proposed decomposition contains 18 implementation steps. All Stage 2 steps r
 The plan preserves Stage 1 architecture and contracts. No Stage 1 structural change was identified as necessary; Stage 2 extends the existing app factory, Alembic baseline, agent lifecycle, Caddy ingress, and Devices route boundary through separately verified steps.
 
 Planning decisions added during review: Stage 2 device list/detail access uses a protected deployment-provided read-only operator service token rather than interactive user/RBAC authentication, and bootstrap verification uses an operator-managed server pepper. Neither value is a device credential, persisted in device records, logged, or returned by an API.
+
+## Stage 2 Step 01 Completion
+
+Status: **Complete**.
+
+Implemented only the typed Stage 2 domain contracts and persistence boundary definitions. No ORM mapping, database migration, route, credential generation, collector, sender, or UI behavior was added.
+
+Files created or modified:
+
+- `server/src/device_watch_server/domain/__init__.py`
+- `server/src/device_watch_server/domain/contracts.py`
+- `server/tests/unit/test_stage2_domain_contracts.py`
+- `docs/progress/current-status.md`
+- `docs/superpowers/plans/2026-09-08-device-watch-stage-2/00-master-index.md`
+
+Contract decisions verified:
+
+- Device identity is UUIDv4 with bounded non-blank display names, server-owned UTC creation time, and active/revoked lifecycle state.
+- Bootstrap and credential lifecycle states are explicit enums without secret fields.
+- Heartbeats are protocol version `1` and contain only submission ID, agent version, and optional timezone-aware observation time.
+- Device summaries expose only identity/current-connectivity fields; credential, hash, bootstrap, metric, and inventory fields are absent.
+- Persistence contracts contain only current last-seen/submission/version values and require a timestamp when a submission identity exists.
+- Contract models are strict (`extra=forbid`) and immutable (`frozen=True`).
+
+Verification executed:
+
+- `uv run --project server --group test pytest server/tests/unit/test_stage2_domain_contracts.py -q`: passed, 7 tests.
+- `uv run --project server --group test ruff check server/src server/tests/unit/test_stage2_domain_contracts.py`: passed.
+- `uv run --project server --group test mypy server/src`: passed, no issues.
+
+Stage 1 regression status: the Step 01 change touched only new Stage 2 domain/test files; completed Stage 1 verification remains preserved. The next permitted work is Step 02 only.

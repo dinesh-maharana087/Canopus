@@ -6,7 +6,7 @@ Stage 2 adds enrollment, device identity, authenticated minimal heartbeats, and 
 
 | Step | Name | Depends on | Status |
 | --- | --- | --- | --- |
-| 01 | Domain contracts and persistence boundaries | Stage 1 | Pending |
+| 01 | Domain contracts and persistence boundaries | Stage 1 | Complete |
 | 02 | Device identity migration | 01 | Pending |
 | 03 | Bootstrap provisioning and persistence | 01, 02 | Pending |
 | 04 | Credential hashing and verification primitives | 01 | Pending |
@@ -85,7 +85,7 @@ Health-only Stage 1 routes remain available; the existing app factory/lifespan r
 
 ## Recommended Step 01
 
-Execute [01-domain-contracts.md](01-domain-contracts.md) first. It must settle shared identifiers, status enums, persistence boundaries, protocol versioning, timestamp rules, and explicit Stage 3 exclusions before any migration or endpoint is written.
+Execute [02-device-identity-migration.md](02-device-identity-migration.md) next. Step 01 settled shared identifiers, status enums, persistence boundaries, protocol versioning, timestamp rules, and explicit Stage 3 exclusions without adding persistence or runtime behavior.
 
 ## Planning Boundary
 
