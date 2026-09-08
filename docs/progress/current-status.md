@@ -456,3 +456,20 @@ No secret or database URL value was echoed. The final evidence run included focu
 Stage 1 is **Complete**. Steps 01 through 17 are complete, with the Docker/MySQL-dependent evidence explicitly blocked by host capability. No later numbered implementation step is defined by this plan.
 
 At each handoff, preserve this evidence boundary: do not represent blocked infrastructure checks as passing, and do not add Stage 2 routes, tables, collectors, senders, credentials, or monitoring fixtures without a new approved scope.
+
+## Stage 2 Planning Status
+
+Status: **Planning complete; implementation not started**.
+
+Stage 2 planning is recorded in:
+
+- Design specification: `docs/superpowers/specs/2026-09-08-device-watch-stage-2-design.md`
+- Master index: `docs/superpowers/plans/2026-09-08-device-watch-stage-2/00-master-index.md`
+- Acceptance contract: `docs/acceptance/stage-02-device-connectivity.md`
+- Execution cards: `docs/superpowers/plans/2026-09-08-device-watch-stage-2/01-domain-contracts.md` through `18-acceptance-evidence.md`
+
+The proposed decomposition contains 18 implementation steps. All Stage 2 steps remain **Pending**. This planning session created no Stage 2 application code, database migration, route, table, collector, sender, credential, or UI functionality.
+
+The plan preserves Stage 1 architecture and contracts. No Stage 1 structural change was identified as necessary; Stage 2 extends the existing app factory, Alembic baseline, agent lifecycle, Caddy ingress, and Devices route boundary through separately verified steps.
+
+Planning decisions added during review: Stage 2 device list/detail access uses a protected deployment-provided read-only operator service token rather than interactive user/RBAC authentication, and bootstrap verification uses an operator-managed server pepper. Neither value is a device credential, persisted in device records, logged, or returned by an API.
