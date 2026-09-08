@@ -1,0 +1,46 @@
+[build-system]
+requires = ["hatchling==1.27.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "device-watch-server"
+version = "0.1.0"
+description = "Device Watch FastAPI server foundation"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "alembic==1.19.1",
+    "fastapi==0.141.1",
+    "httpx==0.28.1",
+    "pydantic-settings==2.15.0",
+    "pymysql==1.2.0",
+    "sqlalchemy==2.0.52",
+    "uvicorn==0.52.4",
+]
+
+[project.scripts]
+device-watch-db-check = "device_watch_server.cli:main"
+
+[dependency-groups]
+test = [
+    "mypy==2.3.1",
+    "pytest==9.1.1",
+    "pytest-asyncio==1.4.0",
+    "ruff==0.16.4",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/device_watch_server"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+markers = [
+    "integration: tests requiring a real MySQL 8.x instance",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
