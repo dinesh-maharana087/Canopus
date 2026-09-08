@@ -171,12 +171,42 @@ Important evidence:
 
 Unresolved issues: none for Step 05. Step 06 remains out of scope and was not started.
 
+## Step 06 Completion
+
+Status: **Complete**.
+
+Implemented secret-safe structured request logging, a sanitized request middleware, and a CLI database-check command that returns a nonzero status when connectivity fails without exposing secrets, credentials, URLs, cookies, or exception detail.
+
+Files created or modified:
+
+- `server/src/device_watch_server/core/logging.py`
+- `server/src/device_watch_server/core/middleware.py`
+- `server/src/device_watch_server/db/health.py`
+- `server/src/device_watch_server/cli.py`
+- `server/tests/unit/test_step06_logging_cli.py`
+- `docs/progress/current-status.md`
+- `docs/superpowers/plans/2026-08-31-device-watch-stage-1/00-master-index.md`
+
+Verification executed:
+
+- `uv run --project server --group test pytest tests/unit/test_step06_logging_cli.py -q`: passed, 4 tests.
+- `uv run --project server --group test pytest tests/unit/test_app.py -q`: passed, 6 tests.
+- `uv run --project server --group test ruff check src tests/unit/test_app.py tests/unit/test_step06_logging_cli.py`: passed.
+- `uv run --project server --group test mypy src`: passed, no issues.
+
+Important evidence:
+
+- Request logs are single-line JSON with only the approved operational fields: event, method, normalized path, status, duration, and timestamp.
+- URL, header, cookie, body, and credential values are sanitized before emission.
+- The database-check CLI exits with 0 on success and 1 on failure while printing only a generic status line.
+- No Step 07 work was started.
+
 ## Current Recommendation
 
-The next coding session must remain strictly at Step 06 only if the user explicitly requests it after Step 05's verification; this session did not start any later step.
+The next coding session must remain strictly at Step 07 only if the user explicitly requests it after Step 06's verification; this session did not start any later step.
 
 ## Step Status
 
-Steps 01, 02, 03, 04, and 05 are Complete. Steps 06 through 17 remain Pending. No implementation beyond Step 05 has started.
+Steps 01, 02, 03, 04, 05, and 06 are Complete. Steps 07 through 17 remain Pending. No implementation beyond Step 06 has started.
 
 At each handoff, record the completed step, files changed, commands and results, environment limitations, commit identifier, and the next permitted step here. Do not mark a step complete based only on planned work.
