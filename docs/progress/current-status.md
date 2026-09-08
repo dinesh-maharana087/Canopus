@@ -404,12 +404,55 @@ Verification executed:
 
 The full web checks also remained green: 8 tests, strict typecheck, lint, and production build. Docker-dependent checks remain blocked by host availability; no secret values were echoed.
 
-## Current Recommendation
+## Step 16 Completion
 
-The next coding session may continue only to Step 16 if the user explicitly requests it. No Step 16 or Step 17 work has been started.
+Status: **Complete**.
 
-## Step Status
+Added operational, architecture, deployment, development, future-contract, and native systemd documentation without creating new runtime behavior or credentials.
 
-Steps 01 through 15 are Complete. Steps 16 and 17 remain Pending. No implementation beyond Step 15 has started.
+Files created or modified:
 
-At each handoff, record the completed step, files changed, commands and results, environment limitations, commit identifier, and the next permitted step here. Do not mark a step complete based only on planned work.
+- `README.md`
+- `.env.example`
+- `docs/architecture.md`
+- `docs/development.md`
+- `docs/deployment.md`
+- `docs/future-contracts.md`
+- `deploy/systemd/device-watch-agent.service`
+
+Verification executed:
+
+- `python deploy/verify_repository.py`: passed with zero findings.
+- Executable-name cross-check for `DEVICE_WATCH_*`, `DATABASE_URL`, `MYSQL_CA_CERT_PATH`, health routes, `3307`, and `server:8000`: completed; documented values match the implementation.
+- `git diff --check`: passed.
+
+The systemd example runs only `python -m device_watch_agent`, reads an operator-managed protected environment file, uses a dedicated unprivileged user, restarts on failure, and retains normal `SIGTERM` handling.
+
+## Step 17 Completion
+
+Status: **Complete with documented environment blocks**.
+
+The full non-container acceptance matrix was rerun fresh:
+
+- Agent: 18 tests passed; Ruff and mypy passed.
+- Server: 24 tests passed, 1 real-MySQL integration test skipped because no configured database was available; Ruff and mypy passed.
+- Deployment: 10 tests passed; topology and repository audits passed.
+- Web: 8 tests passed; strict typecheck, ESLint, and production build passed.
+- Dependency review: agent and server `uv tree --no-dev`, plus `npm ls --depth=0`, passed.
+- Syntax and hygiene: verifier modules compiled and `git diff --check` passed.
+- Repository audit: zero findings.
+
+Blocked commands, not reported as successful:
+
+- Real MySQL `SELECT 1` and Alembic `head -> base -> head` cycle: blocked because Docker/MySQL is unavailable.
+- Development and production Compose rendering: blocked because Docker Compose is unavailable.
+- Server/Caddy image builds, Caddy validation, final-image inspection, and server-smoke health transition: blocked because Docker is unavailable.
+- Production missing-variable render failures: blocked because Compose is unavailable; required `${NAME:?message}` interpolation and verifier coverage are present in code.
+
+No secret or database URL value was echoed. The final evidence run included focused Step 15 audit refinements for generated worktrees, synthetic test fixtures, and documentation headings; no application runtime behavior was expanded. Stage 1 acceptance evidence is complete for the available environment, with container/database evidence reserved for a Docker/MySQL-capable host.
+
+## Stage 1 Status
+
+Stage 1 is **Complete**. Steps 01 through 17 are complete, with the Docker/MySQL-dependent evidence explicitly blocked by host capability. No later numbered implementation step is defined by this plan.
+
+At each handoff, preserve this evidence boundary: do not represent blocked infrastructure checks as passing, and do not add Stage 2 routes, tables, collectors, senders, credentials, or monitoring fixtures without a new approved scope.

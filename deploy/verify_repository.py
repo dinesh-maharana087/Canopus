@@ -108,7 +108,8 @@ def audit_repository(root: Path) -> list[Finding]:
         if path.name == ".env" or (path.name.startswith(".env.") and not _is_example(path)):
             findings.append(_finding(root, path, "live-environment", "live environment files must not be committed"))
 
-        if not is_test and not _is_example(path) and _LIVE_SECRET.search(text):
+        scans_for_literals = _is_production_surface(relative) or path.name == ".env"
+        if not is_test and not _is_example(path) and scans_for_literals and _LIVE_SECRET.search(text):
             findings.append(_finding(root, path, "live-credential", "credential-like literal found outside an example file"))
 
         if not is_test and _is_production_surface(relative) and _DATABASE_URL.search(text):

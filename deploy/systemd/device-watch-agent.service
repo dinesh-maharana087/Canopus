@@ -1,0 +1,18 @@
+[Unit]
+Description=Device Watch native agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=device-watch-agent
+Group=device-watch-agent
+WorkingDirectory=/opt/device-watch/agent
+EnvironmentFile=/etc/device-watch/agent.env
+ExecStart=/usr/bin/python3 -m device_watch_agent
+Restart=on-failure
+RestartSec=5
+KillSignal=SIGTERM
+
+[Install]
+WantedBy=multi-user.target

@@ -21,8 +21,8 @@ This decomposition preserves the approved design in [the Stage 1 specification](
 | 13 | Production Compose topology and verifier | 11, 12 | Complete |
 | 14 | Development smoke profile | 04, 11 | Complete |
 | 15 | Repository security and Stage 1 scope audit | 06, 07, 09, 10, 13, 14 | Complete |
-| 16 | Operational and architecture documentation | 09, 13, 15 | Pending |
-| 17 | Full acceptance verification and evidence capture | 01-16 | Pending |
+| 16 | Operational and architecture documentation | 09, 13, 15 | Complete |
+| 17 | Full acceptance verification and evidence capture | 01-16 | Complete |
 
 ## Execution Order
 
@@ -47,7 +47,7 @@ Before this decomposition, the repository contained only the approved Stage 1 sp
 
 ## Recommended Next Step
 
-Execute [Step 16: Operational and architecture documentation](16-operational-docs.md) next, in a separate session, but only if the user explicitly requests it after Step 15 verification. Do not begin any later step in the same session.
+Stage 1 is complete. No later numbered implementation step is defined by this plan; future work must begin from a new approved scope.
 
 ## Planning Risks
 
