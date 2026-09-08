@@ -37,6 +37,7 @@ def test_generated_value_is_a_strict_32_byte_unpadded_base64url_wire_value() -> 
         "dwb_v1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA+",
         "dwb_v1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
         "dwb_v1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "dwb_v1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB",
     ),
 )
 def test_parser_rejects_malformed_or_wrong_length_values(wire_value: str) -> None:

@@ -71,6 +71,9 @@ class BootstrapValue:
             )
         except (ValueError, binascii.Error):
             raise _invalid_value() from None
+        canonical_payload = base64.urlsafe_b64encode(payload).decode("ascii").rstrip("=")
+        if encoded_payload != canonical_payload:
+            raise _invalid_value()
         return cls(payload)
 
     def to_wire(self) -> str:
