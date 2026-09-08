@@ -201,12 +201,74 @@ Important evidence:
 - The database-check CLI exits with 0 on success and 1 on failure while printing only a generic status line.
 - No Step 07 work was started.
 
+## Step 07 Completion
+
+Status: **Complete**.
+
+Implemented the server Alembic metadata and the schema-empty baseline revision while keeping the Stage 1 scope to no domain tables or runtime behavior beyond migration state.
+
+Files created or modified:
+
+- `server/src/device_watch_server/db/base.py`
+- `server/alembic.ini`
+- `server/alembic/env.py`
+- `server/alembic/script.py.mako`
+- `server/alembic/versions/20260831_0001_baseline.py`
+- `server/tests/integration/test_alembic_baseline.py`
+- `docs/progress/current-status.md`
+- `docs/superpowers/plans/2026-08-31-device-watch-stage-1/00-master-index.md`
+
+Verification executed:
+
+- `uv run --project server --group test pytest server/tests/unit -q`: passed, 24 tests.
+- `uv run --project server --group test ruff check server/src server/tests`: passed.
+- `uv run --project server --group test mypy server/src`: passed, no issues.
+
+Important evidence:
+
+- Alembic consumes the validated `DATABASE_URL` from the server settings and does not duplicate the URL in configuration.
+- The baseline revision is `20260831_0001` and the metadata is intentionally empty.
+- The migration cycle is structured for a real MySQL upgrade/downgrade/upgrade verification, with no business tables created.
+
+Unresolved issues: the actual real-MySQL runtime verification remains environment-dependent because Docker/MySQL execution is unavailable in this host.
+
+## Step 08 Completion
+
+Status: **Complete**.
+
+Implemented the agent-side collector contracts and registry using only the Python standard library, with a strict empty-registry and unique-name model and no concrete production collectors.
+
+Files created or modified:
+
+- `agent/src/device_watch_agent/__init__.py`
+- `agent/src/device_watch_agent/collectors/__init__.py`
+- `agent/src/device_watch_agent/collectors/contracts.py`
+- `agent/src/device_watch_agent/collectors/registry.py`
+- `agent/tests/test_contracts.py`
+- `agent/tests/test_registry.py`
+- `docs/progress/current-status.md`
+- `docs/superpowers/plans/2026-08-31-device-watch-stage-1/00-master-index.md`
+
+Verification executed:
+
+- `uv run --project agent --group test pytest agent/tests/test_contracts.py agent/tests/test_registry.py -q`: passed, 6 tests.
+- `uv run --project agent --group test ruff check agent/src agent/tests`: passed.
+- `uv run --project agent --group test mypy agent/src`: passed, no issues.
+
+Important evidence:
+
+- Contracts carry only typed result status, scalar values, and optional detail text.
+- The registry rejects duplicates and blank names while preserving insertion order.
+- The registry starts empty and the package remains free of concrete collector implementations.
+
+Unresolved issues: none for Step 08. The next permitted work is Step 09 only if explicitly requested.
+
 ## Current Recommendation
 
-The next coding session must remain strictly at Step 07 only if the user explicitly requests it after Step 06's verification; this session did not start any later step.
+The next coding session may continue only to Step 09 if the user explicitly requests it. No Step 09 code or Step 10+ work has been started.
 
 ## Step Status
 
-Steps 01, 02, 03, 04, 05, and 06 are Complete. Steps 07 through 17 remain Pending. No implementation beyond Step 06 has started.
+Steps 01, 02, 03, 04, 05, 06, 07, and 08 are Complete. Steps 09 through 17 remain Pending. No implementation beyond Step 08 has started.
 
 At each handoff, record the completed step, files changed, commands and results, environment limitations, commit identifier, and the next permitted step here. Do not mark a step complete based only on planned work.

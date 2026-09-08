@@ -4,9 +4,8 @@ import importlib.metadata
 
 import pytest
 from sqlalchemy import event
-from sqlalchemy.engine import make_url
-from sqlalchemy.engine.interfaces import DBAPIConnection
 from sqlalchemy.dialects.mysql.pymysql import MySQLDialect_pymysql
+from sqlalchemy.engine import make_url
 
 from device_watch_server.core.config import Environment, Settings
 from device_watch_server.db.engine import (

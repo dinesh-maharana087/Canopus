@@ -12,8 +12,8 @@ This decomposition preserves the approved design in [the Stage 1 specification](
 | 04 | Development MySQL service foundation | 01 | Complete |
 | 05 | FastAPI factory and health endpoints | 02, 03 | Complete |
 | 06 | Server logging and database-check CLI | 05 | Complete |
-| 07 | Alembic metadata and schema-empty baseline | 03, 04 | Pending |
-| 08 | Agent collector contracts and registry | 01 | Pending |
+| 07 | Alembic metadata and schema-empty baseline | 03, 04 | Complete |
+| 08 | Agent collector contracts and registry | 01 | Complete |
 | 09 | Agent configuration and lifecycle | 08 | Pending |
 | 10 | React application shell and theme | 01 | Pending |
 | 11 | Hardened FastAPI production image | 05, 07 | Pending |
@@ -47,7 +47,7 @@ Before this decomposition, the repository contained only the approved Stage 1 sp
 
 ## Recommended Next Step
 
-Execute [Step 03: SQLAlchemy engine and verified MySQL TLS boundary](03-server-engine-tls.md) next, in a separate session. Do not begin any later step in the same session.
+Execute [Step 09: Agent configuration and lifecycle](09-agent-lifecycle.md) next, in a separate session, but only if the user explicitly requests it after Step 08 verification. Do not begin any later step in the same session.
 
 ## Planning Risks
 
