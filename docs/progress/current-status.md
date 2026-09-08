@@ -362,12 +362,54 @@ Verification executed:
 
 Environment limitation: Docker and Docker Compose are not installed or available on PATH, so Compose rendering, image builds, health probes, Caddy validation, and live missing-variable failure checks could not be executed. No `DATABASE_URL` value was echoed.
 
+## Step 14 Completion
+
+Status: **Complete**.
+
+Extended the isolated development Compose file with an opt-in `verification` profile containing a portless `server-smoke` service. It uses the Step 11 server image, points at the `mysql` service name, sets `DEVICE_WATCH_ENV=test`, and waits for healthy MySQL without changing normal native development startup.
+
+Files created or modified:
+
+- `deploy/compose.dev.yml`
+- `deploy/tests/test_development_topology.py`
+
+Verification executed:
+
+- `uv run --project server --group test pytest deploy/tests/test_development_topology.py -q`: passed.
+- Full server/deployment suite including Step 14 tests: 34 passed.
+
+Environment limitation: Docker and Docker Compose remain unavailable, so profile rendering, container health transition, and teardown could not be run.
+
+## Step 15 Completion
+
+Status: **Complete**.
+
+Added a repeatable standard-library repository audit for secrets, unsupported database URLs, live environment files, Stage 2 routes/tables/collectors/senders, frontend network calls, monitoring fixtures, and forbidden production topology. Findings contain only relative paths, rule identifiers, and sanitized messages.
+
+Files created or modified:
+
+- `deploy/verify_repository.py`
+- `deploy/tests/test_verify_repository.py`
+
+Verification executed:
+
+- `uv run --project server --group test pytest deploy/tests/test_verify_repository.py -q`: passed, 4 tests.
+- `python deploy/verify_repository.py`: passed with zero findings.
+- `uv run --project server --group test ruff check server/src server/tests deploy`: passed.
+- `uv run --project server --group test mypy server/src`: passed, no issues.
+- `uv tree --project agent --no-dev`: passed with no runtime dependencies.
+- `uv tree --project server --no-dev`: passed.
+- `npm --prefix web ls --depth=0`: passed.
+- `git diff --check`: passed.
+
+The full web checks also remained green: 8 tests, strict typecheck, lint, and production build. Docker-dependent checks remain blocked by host availability; no secret values were echoed.
+
 ## Current Recommendation
 
-The next coding session may continue only to Step 14 if the user explicitly requests it. No Step 14 or later work has been started.
+The next coding session may continue only to Step 16 if the user explicitly requests it. No Step 16 or Step 17 work has been started.
 
 ## Step Status
 
-Steps 01 through 13 are Complete. Steps 14 through 17 remain Pending. No implementation beyond Step 13 has started.
+Steps 01 through 15 are Complete. Steps 16 and 17 remain Pending. No implementation beyond Step 15 has started.
 
 At each handoff, record the completed step, files changed, commands and results, environment limitations, commit identifier, and the next permitted step here. Do not mark a step complete based only on planned work.

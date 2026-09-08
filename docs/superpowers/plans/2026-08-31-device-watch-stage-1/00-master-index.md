@@ -19,8 +19,8 @@ This decomposition preserves the approved design in [the Stage 1 specification](
 | 11 | Hardened FastAPI production image | 05, 07 | Complete |
 | 12 | Caddy image and path-preserving configuration | 10 | Complete |
 | 13 | Production Compose topology and verifier | 11, 12 | Complete |
-| 14 | Development smoke profile | 04, 11 | Pending |
-| 15 | Repository security and Stage 1 scope audit | 06, 07, 09, 10, 13, 14 | Pending |
+| 14 | Development smoke profile | 04, 11 | Complete |
+| 15 | Repository security and Stage 1 scope audit | 06, 07, 09, 10, 13, 14 | Complete |
 | 16 | Operational and architecture documentation | 09, 13, 15 | Pending |
 | 17 | Full acceptance verification and evidence capture | 01-16 | Pending |
 
@@ -47,7 +47,7 @@ Before this decomposition, the repository contained only the approved Stage 1 sp
 
 ## Recommended Next Step
 
-Execute [Step 14: Development smoke profile](14-development-smoke.md) next, in a separate session, but only if the user explicitly requests it after Step 13 verification. Do not begin any later step in the same session.
+Execute [Step 16: Operational and architecture documentation](16-operational-docs.md) next, in a separate session, but only if the user explicitly requests it after Step 15 verification. Do not begin any later step in the same session.
 
 ## Planning Risks
 

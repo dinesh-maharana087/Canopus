@@ -23,6 +23,29 @@ services:
     networks:
       - device_watch_dev
 
+  server-smoke:
+    profiles:
+      - verification
+    build:
+      context: ..
+      dockerfile: server/Dockerfile
+    image: device-watch-server:stage1
+    environment:
+      DEVICE_WATCH_ENV: test
+      DATABASE_URL: mysql+pymysql://device_watch_dev:device_watch_dev@mysql:3306/device_watch
+    depends_on:
+      mysql:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    networks:
+      - device_watch_dev
+
 networks:
   device_watch_dev:
     driver: bridge
