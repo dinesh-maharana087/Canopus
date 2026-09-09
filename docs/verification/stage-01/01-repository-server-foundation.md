@@ -1,0 +1,171 @@
+# Stage 1 Verification V01 — Repository and Server Foundation
+
+Date: 2026-09-09
+
+Scope: Stage 1 Steps 01–03 only
+
+Overall result: **FAIL**
+
+Step results: **Step 01 FAIL; Step 02 FAIL; Step 03 FAIL**. Step 03's
+implemented runtime behavior passed, but its required committed regression coverage
+did not.
+
+No implementation was changed and no Stage 1 baseline was created. V01 found four
+contract defects. Docker/Compose availability and the supported Node runtime check
+also have environment blocks.
+
+## Components reviewed
+
+- Approved Stage 1 design sections for repository boundaries, configuration,
+  backend engine ownership, verification, safeguards, and acceptance.
+- Stage 1 master-index entries, current-status entries, and execution cards for
+  Steps 01–03.
+- The original implementation-plan constraints and Task 1/Task 2 portions consumed
+  by those cards.
+- Root safeguards and project metadata: `.gitignore`, `.dockerignore`,
+  `.editorconfig`, `.env.example`, `README.md`, both `pyproject.toml`/`uv.lock`
+  pairs, and `web/package.json`/`package-lock.json`.
+- Step 02–03 implementation and focused tests in
+  `server/src/device_watch_server/core/config.py`,
+  `server/src/device_watch_server/db/engine.py`, `server/tests/conftest.py`,
+  `server/tests/unit/test_config.py`, and
+  `server/tests/unit/test_engine_tls.py`.
+
+No Step 04–17, frontend implementation, deployment configuration, Caddy,
+unrelated agent implementation, or Stage 2 behavior was reviewed.
+
+## Results and stable contracts
+
+| Step | Contract | Result | Evidence |
+| --- | --- | --- | --- |
+| 01 | Repository component boundaries | **PASS** | The five approved component roots exist; agent, server, and web have separate manifests. Design lines 40–50. |
+| 01 | Independent agent/server Python projects | **PASS** | `agent/pyproject.toml` and `server/pyproject.toml` define distinct packages and environments. |
+| 01 | Independent frozen Python locks | **PASS** | Both `uv sync --frozen` commands and both locked tree commands completed. The agent runtime tree contains only `device-watch-agent`. |
+| 01 | Frontend package lock | **PASS** | `npm ci --ignore-scripts --no-audit --no-fund` completed from `web/`; `npm ls --omit=dev --depth=0` resolved the three runtime packages. |
+| 01 | Runtime/development dependency separation | **FAIL** | Agent and web are separated, but server declares test-only `httpx==0.28.1` as runtime metadata; see V01-01. |
+| 01 | Environment, key, virtualenv, cache, dependency, build, and coverage safeguards | **PASS** | Repository `.gitignore` lines 1–20 were exercised with `git check-ignore`; the allowlist-style `.dockerignore` was inspected directly. |
+| 01 | Local-database and editor-artifact safeguards | **FAIL** | The design requires both categories (design line 368), but repository `.gitignore` has neither; see V01-02. |
+| 02 | Required `DEVICE_WATCH_ENV` under its documented uppercase name | **FAIL** | The field has no default, but uppercase input is not discovered by a case-sensitive POSIX settings source; see V01-03. |
+| 02 | Accepted modes are exactly `development`, `test`, and `production` | **PASS** | `Environment` contains exactly those values (`config.py` lines 13–18); focused tests passed. |
+| 02 | Required `DATABASE_URL` under its documented uppercase name | **FAIL** | The field has no default and is secret-typed, but the same POSIX name-casing defect prevents uppercase discovery; see V01-03. |
+| 02 | Exact `mysql+pymysql` enforcement | **PASS** | `make_url` output is checked for the exact driver at `config.py` lines 61–73; focused tests passed. |
+| 02 | Production TLS validation | **PASS** | The exact three values are defined at `config.py` lines 25–29 and raw query pairs are checked at lines 85–97, including duplicate/additional rejection. |
+| 02 | Credential/URL-safe representations and validation errors | **PASS** | `SecretStr`, hidden validation input, sanitized `load_settings()`, and redaction tests passed. |
+| 03 | Centralized application engine creation | **PASS** | The sole application `create_engine()` call is in `db/engine.py` lines 41–49; application callers use the factory. |
+| 03 | Connection pre-ping and 1,800-second recycling | **PASS** | Source lines 46–47 and a no-network V01 engine probe confirmed `_pre_ping=True` and `_recycle=1800`. |
+| 03 | Production TLS reaches the PyMySQL boundary as exact flat boolean arguments | **PASS** | The 14-test focused suite passed the locked translation and `do_connect` capture assertions. |
+| 03 | No competing/incorrect SSL mapping | **PASS** | `database_engine_url()` strips validated query keys before translation; tests confirmed no nested `ssl` mapping at the driver boundary. |
+| 03 | TLS characterization requires no network connection | **PASS** | The `do_connect` listener raises `ConnectionIntercepted` before driver I/O; the focused test passed. |
+| 03 | Required committed regression coverage for engine options | **FAIL** | Engine behavior is correct, but the execution-card definition of done requires engine options to be tested and no pool-option assertion exists; see V01-04. |
+
+## Defects discovered
+
+### V01-01 — Step 01 server runtime includes test-only `httpx`
+
+**FAIL.** The approved runtime table contains exactly Alembic, FastAPI, Pydantic
+Settings, PyMySQL, SQLAlchemy, and Uvicorn; the following plan sentence places
+server-specific `httpx` with the `test` dependency group
+(`2026-08-31-device-watch-stage-1.md` lines 172–185). Current
+`server/pyproject.toml` instead lists `httpx==0.28.1` in runtime dependencies at
+line 13 and omits it from the test group at lines 23–29. The lock consequently
+records it in `requires-dist` at `server/uv.lock` lines 144–151, and the
+runtime-only tree includes `httpx`, `httpcore`, and `certifi`.
+
+Affected files: `server/pyproject.toml`, `server/uv.lock`.
+
+### V01-02 — Step 01 ignore rules omit two required safeguard categories
+
+**FAIL.** The approved design says ignore rules cover local databases and editor
+artifacts (`2026-08-31-device-watch-stage-1-design.md` line 368).
+Repository `.gitignore` lines 1–20 contain no corresponding patterns. With the
+global Git excludes file disabled, `git check-ignore --no-index` matched the
+positive-control private/generated paths but did not match `device-watch.sqlite`,
+`local.db`, `.vscode/settings.json`, or `.idea/workspace.xml`.
+
+Affected file: `.gitignore`.
+
+### V01-03 — Step 02 documented uppercase settings fail on POSIX
+
+**FAIL.** `Settings` combines lowercase field names with
+`case_sensitive=True` (`config.py` lines 35–44), while the stable external
+contract uses uppercase `DEVICE_WATCH_ENV` and `DATABASE_URL`. A case-sensitive
+`EnvSettingsSource` probe against the locked Pydantic Settings 2.15.0 returned no
+keys for the uppercase mapping and returned both keys for the lowercase mapping:
+
+```text
+uppercase_keys []
+lowercase_keys ['database_url', 'device_watch_env']
+```
+
+Windows environment lookup is case-insensitive, so the committed Windows test run
+does not expose the production Linux failure. Correctly supplied uppercase
+variables will be reported missing before engine construction on POSIX.
+
+Affected file: `server/src/device_watch_server/core/config.py`; coverage gap in
+`server/tests/unit/test_config.py`.
+
+### V01-04 — Step 03 pool options lack required committed regression assertions
+
+**FAIL.** The Step 03 execution card requires pre-ping and 1,800-second recycling
+at line 32 and states that engine options are tested at line 42. The implementation
+is correct (`db/engine.py` lines 46–47), and the V01 no-network probe passed, but a
+targeted search of `server/tests` found no assertion for `pool_pre_ping`,
+`pool_recycle`, `_pre_ping`, or `_recycle` in the Step 03 unit tests.
+
+Affected file: `server/tests/unit/test_engine_tls.py`.
+
+## Commands actually executed
+
+| Command/check | Result |
+| --- | --- |
+| `git status --short` (initial) | **PASS** — only pre-existing untracked `AGENTS.md`. |
+| workspace `uv --version`; `node --version`; `npm.cmd --version` | **PASS** — uv 0.12.6, Node v22.14.0, npm 10.9.2. |
+| `Get-Command docker` | **BLOCKED BY ENVIRONMENT** — Docker/Compose unavailable. |
+| workspace `uv ... sync --project agent --frozen` | **PASS**. |
+| workspace `uv ... sync --project server --frozen` | **PASS**. |
+| workspace `uv ... tree --project agent --no-dev --locked` | **PASS** — agent package only. |
+| workspace `uv ... tree --project server --no-dev --locked` | **FAIL** contract check — runtime tree contains test-only `httpx`. |
+| `npm.cmd ci --ignore-scripts --no-audit --no-fund` from `web/` | **PASS** — 275 packages; emitted the Node engine warning below. |
+| `npm.cmd ls --omit=dev --depth=0` from `web/` | **PASS** — React, React DOM, and React Router only. |
+| workspace `uv ... pytest server/tests/unit/test_config.py server/tests/unit/test_engine_tls.py -q` | **PASS** — 14 passed in 0.47s. |
+| workspace `uv ... ruff check` on Step 02–03 source/tests | **PASS** — all checks passed. |
+| workspace `uv ... mypy` on `core/config.py` and `db/engine.py` | **PASS** — no issues in 2 source files. |
+| case-sensitive `EnvSettingsSource` uppercase/lowercase probe | **FAIL** — uppercase produced zero fields; lowercase produced both fields. |
+| no-network engine pool/URL probe | **PASS** — pre-ping, recycle, and configured URL fields confirmed. |
+| scoped `rg` scan for application `create_engine()` calls | **PASS** — one centralized production call. |
+| repository-only `git check-ignore -v --no-index` safeguard probe | **FAIL** — local-database/editor paths unmatched. |
+| `git diff --check` (final) | **PASS**. |
+| `git diff --stat`; `git diff` (final) | **PASS** — no tracked-file change; the evidence document is untracked. |
+| `git status --short` (final) | **PASS with pre-existing item** — new V01 evidence document plus pre-existing untracked `AGENTS.md`. |
+
+The first sandboxed npm cache access and an offline Ruff dependency lookup were
+retried successfully using the existing host cache and the committed locked test
+dependency set. No system software was installed.
+
+## Environment blocks
+
+- **BLOCKED BY ENVIRONMENT:** Docker and Docker Compose are not installed or not
+  available on `PATH`, so the Step 01 tool-version check could not run. No Step
+  01–03 functional verification requires Docker.
+- **BLOCKED BY ENVIRONMENT:** Node v22.14.0 is below React Router 8.3.1's declared
+  minimum of Node 22.22.0 (`web/package-lock.json` lines 3769–3778). The frozen
+  install completed with `EBADENGINE`, but supported frontend runtime compatibility
+  cannot be claimed on this host.
+
+## Source locations for dependent stages
+
+- Project and lock contracts: `agent/pyproject.toml`, `agent/uv.lock`,
+  `server/pyproject.toml`, `server/uv.lock`, `web/package.json`, and
+  `web/package-lock.json`.
+- Environment enum, production TLS constants, settings validation, and safe loader:
+  `server/src/device_watch_server/core/config.py` lines 13–117.
+- Flat production driver arguments, sanitized engine URL, and engine factory:
+  `server/src/device_watch_server/db/engine.py` lines 15–49.
+- Current focused characterization suites:
+  `server/tests/unit/test_config.py` and
+  `server/tests/unit/test_engine_tls.py`.
+
+Future stages must not treat the Step 01 dependency/safeguard contracts, the
+uppercase POSIX settings-loading path, or the Step 03 pool-option regression
+coverage as verified until the defects above are resolved in a separately
+authorized implementation session.
