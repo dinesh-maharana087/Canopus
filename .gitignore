@@ -14,6 +14,19 @@ node_modules/
 dist/
 coverage/
 .coverage
+
+# Local databases
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+
+# Editor artifacts
+.idea/
+.vscode/
+
 .worktrees/
 .superpowers/
 .tmp/

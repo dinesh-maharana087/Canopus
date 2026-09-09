@@ -24,6 +24,20 @@ PRODUCTION_DATABASE_URL = (
 )
 
 
+def test_engine_configures_pre_ping_and_recycling_without_connecting() -> None:
+    settings = Settings(
+        device_watch_env=Environment.TEST,
+        database_url=VALID_DATABASE_URL,
+    )
+    engine = create_database_engine(settings)
+
+    try:
+        assert engine.pool._pre_ping is True
+        assert engine.pool._recycle == 1_800
+    finally:
+        engine.dispose()
+
+
 def test_locked_sqlalchemy_pymysql_url_translation_characterization() -> None:
     url = make_url(
         "mysql+pymysql://user:secret@db:3306/device_watch"

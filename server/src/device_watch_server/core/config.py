@@ -5,7 +5,7 @@ from __future__ import annotations
 from enum import Enum
 from urllib.parse import parse_qsl, urlsplit
 
-from pydantic import SecretStr, ValidationError, field_validator, model_validator
+from pydantic import Field, SecretStr, ValidationError, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import URL, make_url
 
@@ -38,10 +38,11 @@ class Settings(BaseSettings):
         extra="forbid",
         frozen=True,
         hide_input_in_errors=True,
+        populate_by_name=True,
     )
 
-    device_watch_env: Environment
-    database_url: SecretStr
+    device_watch_env: Environment = Field(validation_alias="DEVICE_WATCH_ENV")
+    database_url: SecretStr = Field(validation_alias="DATABASE_URL")
     device_watch_enable_docs: bool = False
     device_watch_bootstrap_hmac_pepper: SecretStr | None = None
 

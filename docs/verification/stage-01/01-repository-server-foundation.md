@@ -4,15 +4,73 @@ Date: 2026-09-09
 
 Scope: Stage 1 Steps 01–03 only
 
-Overall result: **FAIL**
+Overall result after R1 re-verification: **FAIL**
 
-Step results: **Step 01 FAIL; Step 02 FAIL; Step 03 FAIL**. Step 03's
+V01 status: **NOT REPAIRED / NOT VERIFIED**. All four implementation failures from
+the initial pass remain present in the checked-out tree. No V01 repair commit,
+tracked repair-path diff, or repair stash was available to verify at `HEAD`
+`91a52e0`.
+
+## R1 re-verification
+
+Scope was limited to the four reported V01 failures and their existing focused
+regression checks. The final Stage 1 baseline was read for inherited context but was
+not modified.
+
+| Repaired finding | Result | Current evidence |
+| --- | --- | --- |
+| `httpx` dependency classification | **FAIL** | `server/pyproject.toml` still declares `httpx==0.28.1` in `[project].dependencies`, not the `test` group. `server/uv.lock` still records it as a direct runtime dependency, and the frozen `--no-dev` tree contains top-level `httpx`, `httpcore`, and `certifi`. |
+| Local-database/editor ignore rules | **FAIL** | Repository `.gitignore` still has no local-database or editor-metadata patterns. With the global excludes file disabled, none of `device-watch.sqlite`, `local.db`, `.vscode/settings.json`, or `.idea/workspace.xml` matched; `git check-ignore` exited 1. |
+| POSIX uppercase settings handling | **FAIL** | `Settings` still combines lowercase fields with `case_sensitive=True` and no uppercase aliases. A case-sensitive mapping containing `DEVICE_WATCH_ENV` and `DATABASE_URL` produced `uppercase_keys []` and exited 1. |
+| SQLAlchemy pool option assertions | **FAIL** | The no-network runtime probe still confirms `(pool._pre_ping, pool._recycle) == (True, 1800)`, but `server/tests/unit/test_engine_tls.py` still contains no assertion for `pool_pre_ping`, `pool_recycle`, `_pre_ping`, or `_recycle`; the scoped search exited 1. |
+
+### Focused regression results
+
+| Command/check | Result |
+| --- | --- |
+| workspace `uv ... tree --project server --no-dev --frozen` | **FAIL** contract check — the locked runtime tree still includes direct `httpx`. |
+| repository-only `git check-ignore --no-index` for the four required safeguard examples | **FAIL** — no path matched. |
+| case-sensitive `EnvSettingsSource` uppercase-name probe | **FAIL** — `uppercase_keys []`. |
+| scoped pool-assertion search in `server/tests/unit/test_engine_tls.py` | **FAIL** — no committed pool-option assertion found. |
+| workspace `uv ... pytest server/tests/unit/test_config.py server/tests/unit/test_engine_tls.py -q` | **PASS** — 14 passed in 0.71s. |
+| workspace `uv ... ruff check` on the V01 configuration/engine source and tests | **PASS** — all checks passed. |
+| workspace `uv ... mypy` on `core/config.py` and `db/engine.py` | **PASS** — no issues in 2 source files. |
+| no-network engine pool probe | **PASS** — `pool_options (True, 1800)`. |
+| `git diff --check -- docs/verification/stage-01/01-repository-server-foundation.md` | **PASS** — the V01 evidence update has no whitespace error. |
+| repository-wide `git diff --check` | **FAIL outside V01 scope** — pre-existing user modification `AGENTS.md:548` has a blank line at EOF; the file was not changed in this session. |
+| `git status --short` | V01 evidence modified as intended; pre-existing modified `AGENTS.md` and untracked `stage-01-baseline.md` remain untouched. |
+
+The first sandboxed Python invocation could not reach the existing host interpreter;
+the identical locked, offline command succeeded with approved host-interpreter
+access. No dependency or system software was installed. There are no unresolved
+environment blocks for this R1 re-verification.
+
+### R1 re-verification commands actually executed
+
+- `git status --short`; `git log -10 --oneline --decorate`; scoped `git diff` and
+  reachable-ref/stash searches for R1 changes.
+- workspace `uv --offline --no-python-downloads tree --project server --no-dev --frozen`.
+- `git -c core.excludesFile=NUL check-ignore --no-index -v -- device-watch.sqlite local.db .vscode/settings.json .idea/workspace.xml`.
+- workspace `uv ... pytest server/tests/unit/test_config.py server/tests/unit/test_engine_tls.py -q`.
+- workspace `uv ... ruff check` on the four V01 source/test files.
+- workspace `uv ... mypy server/src/device_watch_server/core/config.py server/src/device_watch_server/db/engine.py`.
+- case-sensitive `EnvSettingsSource` uppercase-name characterization using the
+  locked server environment.
+- scoped `rg` assertion search in `server/tests/unit/test_engine_tls.py`.
+- no-network SQLAlchemy engine pool characterization using the locked server
+  environment.
+- `git diff --check`; scoped evidence-file `git diff --check`; `git diff --stat`;
+  `git status --short`.
+
+## Original V01 evidence (initial pass)
+
+Initial step results: **Step 01 FAIL; Step 02 FAIL; Step 03 FAIL**. Step 03's
 implemented runtime behavior passed, but its required committed regression coverage
 did not.
 
-No implementation was changed and no Stage 1 baseline was created. V01 found four
-contract defects. Docker/Compose availability and the supported Node runtime check
-also have environment blocks.
+No implementation was changed during the initial pass and no Stage 1 baseline was
+created then. V01 found four contract defects. Docker/Compose availability and the
+supported Node runtime check also had environment blocks.
 
 ## Components reviewed
 

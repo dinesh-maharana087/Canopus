@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from unittest.mock import patch
+
 import pytest
 from pydantic import ValidationError
 
@@ -27,6 +29,19 @@ def set_environment(
 ) -> None:
     monkeypatch.setenv("DEVICE_WATCH_ENV", environment)
     monkeypatch.setenv("DATABASE_URL", database_url)
+
+
+def test_documented_uppercase_names_load_from_case_sensitive_environment() -> None:
+    case_sensitive_environment = {
+        "DEVICE_WATCH_ENV": "test",
+        "DATABASE_URL": VALID_DATABASE_URL,
+    }
+
+    with patch("os.environ", case_sensitive_environment):
+        settings = load_settings()
+
+    assert settings.device_watch_env is Environment.TEST
+    assert settings.database_url.get_secret_value() == VALID_DATABASE_URL
 
 
 def test_missing_environment_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
