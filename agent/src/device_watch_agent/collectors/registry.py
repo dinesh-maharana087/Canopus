@@ -19,7 +19,7 @@ class CollectorRegistry:
         name = collector.name.strip()
         if not name:
             raise ValueError("Collector name must be non-empty")
-        if any(existing.name == name for existing in self._collectors):
+        if any(existing.name.strip() == name for existing in self._collectors):
             raise ValueError(f"Duplicate collector name: {name}")
         self._collectors.append(collector)
 

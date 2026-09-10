@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import Enum
 from types import MappingProxyType
@@ -23,7 +24,9 @@ class CollectorResult:
     """Metadata summarizing a collector attempt without domain fields."""
 
     status: CollectorStatus
-    values: MappingProxyType[str, CollectorScalar] = field(default_factory=lambda: MappingProxyType({}))
+    values: Mapping[str, CollectorScalar] = field(
+        default_factory=lambda: MappingProxyType({})
+    )
     detail: str | None = None
 
     def __post_init__(self) -> None:

@@ -2,14 +2,38 @@
 
 from __future__ import annotations
 
+import json
 import logging
+from datetime import UTC, datetime
+
+_STANDARD_RECORD_FIELDS = frozenset(
+    logging.LogRecord("", 0, "", 0, "", (), None).__dict__
+) | {"asctime", "message"}
 
 
 class AgentFormatter(logging.Formatter):
-    """Keep agent logs compact and operationally useful."""
+    """Render compact newline-delimited JSON records."""
 
     def format(self, record: logging.LogRecord) -> str:
-        return f"{record.levelname.lower()} {record.getMessage()}"
+        payload = {
+            key: value
+            for key, value in record.__dict__.items()
+            if key not in _STANDARD_RECORD_FIELDS
+        }
+        payload.update(
+            {
+                "level": record.levelname.lower(),
+                "message": record.getMessage(),
+                "timestamp": datetime.fromtimestamp(record.created, UTC).isoformat(),
+            }
+        )
+        return json.dumps(
+            payload,
+            default=str,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        )
 
 
 def setup_logging() -> None:

@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 from collections.abc import Mapping
 from dataclasses import dataclass
+from math import isfinite
 
 
 class AgentSettingsError(ValueError):
@@ -48,7 +49,7 @@ def load_settings(environ: Mapping[str, str] | None = None) -> AgentSettings:
         raise AgentSettingsError(
             "DEVICE_WATCH_AGENT_INTERVAL_SECONDS must be a positive number"
         ) from exc
-    if interval <= 0:
+    if not isfinite(interval) or interval <= 0:
         raise AgentSettingsError(
             "DEVICE_WATCH_AGENT_INTERVAL_SECONDS must be a positive number"
         )

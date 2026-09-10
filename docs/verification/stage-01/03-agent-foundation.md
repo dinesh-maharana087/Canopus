@@ -1,6 +1,72 @@
 # Stage 1 Verification V03 — Agent Foundation
 
-## Scope and result
+## R3A targeted repair re-verification (current)
+
+- Re-verification date: 2026-09-10.
+- Repair base: `0726ae5`.
+- Scope: only the five V03 failures repaired by Stage 1 R3A.
+- Overall current result: **PASS WITH ENVIRONMENT BLOCKS**.
+- Step 08 current result: **PASS**.
+- Step 09 current result: **PASS WITH ENVIRONMENT BLOCKS**.
+- All five implementation/coverage failures are repaired and exercised by
+  focused regression tests in this working tree.
+- No real collector, sender, database, server communication, outbound I/O, or
+  local agent database was added.
+- The consolidated Stage 1 baseline was not updated in this repair session.
+
+### Repaired findings
+
+| Finding | Result | Current evidence |
+| --- | --- | --- |
+| V03-01 - public collector-result mapping type | **PASS** | `CollectorResult.values` now exposes `Mapping[str, CollectorScalar]` while `__post_init__` retains a defensive `MappingProxyType` copy; the regression checks both the public annotation and source-copy isolation |
+| V03-02 - padded duplicate collector names | **PASS** | Registry comparison normalizes both stored and incoming names; regressions cover padded-to-padded and both padded/canonical registration orders while preserving a one-item registry |
+| V03-03 - non-finite collection intervals | **PASS** | Configuration now requires a finite value greater than zero; regressions reject `nan`, `inf`, and `-inf` in addition to the existing invalid cases |
+| V03-04 - structured agent logging | **PASS** | The standard-library formatter emits one compact JSON object per line with UTC timestamp, level, interpolated message, and structured extras; the regression parses two emitted lines as JSON |
+| V03-05 - automated signal-handler coverage | **PASS** | A supported-loop test double verifies registration of both `SIGINT` and `SIGTERM` and proves each callback sets the real `asyncio.Event` stop request |
+
+### R3A commands and results
+
+`[uv]` is the existing
+`D:\Dinesh\deviceHealth\.tmp\uv-tool\Scripts\uv.exe` with frozen,
+offline, no-Python-download operation and the repository-local cache.
+
+| Command | Result |
+| --- | --- |
+| Focused regression pytest before production repair | **FAIL as expected** - 6 failed and 19 passed, reproducing the mapping annotation, padded-name, non-finite interval, and JSON logging defects; the signal-wiring regression passed because production wiring was already correct |
+| `[uv] run --project agent --frozen --group test pytest agent/tests -q` | **PASS** - 27 passed in 0.06s |
+| `[uv] run --project agent --frozen --group test ruff check agent/src agent/tests` | **PASS** - all checks passed |
+| `[uv] run --project agent --frozen --group test mypy agent/src` | **PASS** - no issues in 9 source files |
+
+The first sandboxed focused pytest launch could not access the existing host
+Python installation. The same focused pytest command was then run once with
+approved host access, where it produced the expected red result; this did not
+block final verification.
+
+### Remaining environment block
+
+- **BLOCKED BY ENVIRONMENT:** The original real process-level OS-signal check
+  remains unavailable on this Windows `ProactorEventLoop`, which does not
+  implement `add_signal_handler`. R3A did not retry that known unavailable
+  platform check. Supported-loop callback registration and requested-stop
+  behavior are covered by automated tests.
+
+### Current source and regression locations
+
+- Public result mapping: `agent/src/device_watch_agent/collectors/contracts.py`
+  and `agent/tests/test_contracts.py`.
+- Registry normalization: `agent/src/device_watch_agent/collectors/registry.py`
+  and `agent/tests/test_registry.py`.
+- Finite interval validation: `agent/src/device_watch_agent/config.py` and
+  `agent/tests/test_config.py`.
+- Structured JSON formatter: `agent/src/device_watch_agent/logging.py` and
+  `agent/tests/test_logging.py`.
+- Signal wiring regression: `agent/src/device_watch_agent/main.py` and
+  `agent/tests/test_main.py`.
+
+No R3A implementation failure remains. V03 is repaired and verified, subject
+only to the retained environment block above.
+
+## Original scope and result (historical)
 
 - Verification base: `c32fa69eae0c2faa7ae6bad32b5b8f3f5caf1ae9`.
 - Scope: Stage 1 Steps 08–09 only.

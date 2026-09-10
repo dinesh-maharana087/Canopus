@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from types import MappingProxyType
+from typing import get_origin, get_type_hints
 
 import pytest
 
 from device_watch_agent.collectors.contracts import (
     Collector,
     CollectorResult,
+    CollectorScalar,
     CollectorStatus,
 )
 
@@ -57,3 +60,20 @@ def test_result_values_are_immutable() -> None:
     result = CollectorResult(status=CollectorStatus.SUCCESS, values={"count": 2})
     with pytest.raises(TypeError):
         result.values["count"] = 9
+
+
+def test_result_values_expose_the_mapping_contract_and_copy_input() -> None:
+    source: Mapping[str, CollectorScalar] = {"count": 2}
+
+    result = CollectorResult(status=CollectorStatus.SUCCESS, values=source)
+
+    assert get_origin(get_type_hints(CollectorResult)["values"]) is Mapping
+    assert result.values == {"count": 2}
+
+    mutable_source = {"count": 2}
+    copied_result = CollectorResult(
+        status=CollectorStatus.SUCCESS,
+        values=mutable_source,
+    )
+    mutable_source["count"] = 9
+    assert copied_result.values == {"count": 2}

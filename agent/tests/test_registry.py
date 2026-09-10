@@ -51,3 +51,24 @@ def test_registry_rejects_blank_names() -> None:
 
     with pytest.raises(ValueError, match="non-empty"):
         registry.register(BlankCollector())
+
+
+@pytest.mark.parametrize(
+    ("first_name", "duplicate_name"),
+    [
+        (" alpha ", " alpha "),
+        ("alpha", " alpha "),
+        (" alpha ", "alpha"),
+    ],
+)
+def test_registry_rejects_names_that_duplicate_after_trimming(
+    first_name: str,
+    duplicate_name: str,
+) -> None:
+    registry = CollectorRegistry()
+    registry.register(LocalCollector(first_name))
+
+    with pytest.raises(ValueError, match="Duplicate collector name"):
+        registry.register(LocalCollector(duplicate_name))
+
+    assert len(registry) == 1

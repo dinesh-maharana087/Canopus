@@ -26,7 +26,10 @@ def test_default_and_positive_interval() -> None:
     ).interval_seconds == 2.5
 
 
-@pytest.mark.parametrize("interval", ["0", "-1", "not-a-number"])
+@pytest.mark.parametrize(
+    "interval",
+    ["0", "-1", "not-a-number", "nan", "inf", "-inf"],
+)
 def test_non_positive_or_invalid_interval_fails(interval: str) -> None:
     with pytest.raises(AgentSettingsError, match="positive number"):
         load_settings(
