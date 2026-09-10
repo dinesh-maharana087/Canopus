@@ -1,5 +1,85 @@
 # Stage 1 Verification V02 - Server, Database, and Migrations
 
+## Targeted re-verification after R2A-R2C
+
+Date: 2026-09-10
+Repository state: committed R2A/R2B repairs through `dc85419`, plus the
+uncommitted R2C test-harness repair
+Scope: Stage 1 Steps 04-07 only
+
+Current overall result: **PASS WITH ENVIRONMENT BLOCKS**.
+
+- **PASS:** all implementation, static, no-network, and available test contracts.
+- **FAIL:** none.
+- **BLOCKED BY ENVIRONMENT:** actual Docker Compose rendering/startup, MySQL
+  health/connectivity, and the real baseline migration cycle.
+
+This section supersedes the original result below for the current repository
+state. The original 2026-09-09 verification is retained as historical defect
+evidence. V07 and the consolidated Stage 1 baseline were not updated in this
+task.
+
+### Current result mapping
+
+| Step | Contract | Result | Current evidence |
+| --- | --- | --- | --- |
+| 04 | Development MySQL image, sample environment, loopback port, named volume, health check, and isolation | **PASS** | The unchanged Compose definition retains the previously verified static contracts. The repaired test now invokes `docker compose ... config --format json`, parses the result, and asserts the rendered structures. |
+| 04 | Host-environment isolation for development samples | **PASS** | A focused regression pollutes all four `MYSQL_*` interpolation variables with harmless values and proves none reach the Compose subprocess environment. |
+| 04 | Actual Compose render, MySQL startup, and health | **BLOCKED BY ENVIRONMENT** | The single `docker version` availability check found no Docker executable. The rendered-topology test therefore recorded one explicit environment skip. |
+| 05 | FastAPI factory uses the versioned router | **PASS** | `create_app()` includes `api_router`; the focused factory regression passed. |
+| 05 | Liveness, database-backed readiness, generic failure, and owned-engine disposal | **PASS** | Focused application tests passed without a network connection. |
+| 06 | Newline-delimited structured request logging, approved field set, and redaction | **PASS** | Focused tests parsed one JSON object per output line, accepted only `normalized_path`, and found no synthetic query/header/cookie secret. |
+| 06 | Readiness warning event | **PASS** | The failure path emits `database_readiness_failed`; the focused log-record assertion passed. |
+| 06 | Database-check CLI output, exit codes, redaction, and disposal | **PASS** | Focused success/failure tests passed with exact generic output. |
+| 07 | Empty metadata and deterministic constraint naming | **PASS** | The regression generated deterministic PK/FK/UQ/CK/index names and confirmed `Base.metadata.tables == {}`. |
+| 07 | Behavior-free scoped baseline and single settings source | **PASS** | The unchanged `20260831_0001` revision remains the scoped Stage 1 baseline and `sqlalchemy.url` remains empty in `alembic.ini`. |
+| 07 | Validated Alembic URL/TLS boundary, percent-safe URL handling, and script resolution | **PASS** | Offline percent-URL and repository-root path tests passed; a no-network online test reached PyMySQL with the three approved TLS arguments, boolean verification flags, and no competing `ssl` mapping. |
+| 07 | Configured integration environment reaches the migration test | **PASS** | With credential-free external settings, the selected integration regression passed and performed no database connection. |
+| 07 | Real MySQL connectivity and `upgrade -> base -> upgrade` cycle | **BLOCKED BY ENVIRONMENT** | The prescribed development MySQL service cannot be started without Docker; no connection or migration mutation was attempted. |
+
+### Repaired findings
+
+| Finding | Result | Repair evidence |
+| --- | --- | --- |
+| V02-01 rendered topology test | **PASS** | The test consumes actual Compose JSON rather than YAML text and sanitizes host interpolation variables. Its live execution is separately environment-blocked. |
+| V02-02 versioned router | **PASS** | R2A route-boundary regression passed. |
+| V02-03 logging framing/fields | **PASS** | R2A multi-record and request-field regressions passed. |
+| V02-04 readiness event | **PASS** | R2A event regression passed. |
+| V02-05 CLI contract | **PASS** | R2A exact-output regressions passed. |
+| V02-06 metadata convention | **PASS** | R2B deterministic-name regression passed. |
+| V02-07 TLS and percent URLs | **PASS** | R2B offline and no-network driver-boundary regressions passed. |
+| V02-08 Alembic script path | **PASS** | R2B repository-root `ScriptDirectory` regression passed. |
+| V02-09 integration fixture | **PASS** | Integration-marked tests retain `DEVICE_WATCH_ENV` and `DATABASE_URL`; non-integration tests remain isolated and optional settings are still cleared. |
+
+### Commands and results
+
+| Command/check | Result |
+| --- | --- |
+| `docker version` | **BLOCKED BY ENVIRONMENT** - command not found; checked once and not retried. |
+| Focused pytest over `test_development_mysql.py`, `test_app.py`, `test_step06_logging_cli.py`, and `test_alembic_configuration.py` | **PASS** - 19 passed, 1 Docker-dependent skip, 2 dependency deprecation warnings. |
+| Selected configured integration-environment preservation test | **PASS** - 1 passed; credential-free URL, no connection attempted. |
+| Focused Ruff over Step 04-07 source/configuration tests | **PASS** - all checks passed. |
+| V02 source-focused mypy plus the changed topology/fixture files | **PASS** - no issues in 13 files. |
+| Polluted-host Compose-environment regression before/after sanitization | Expected red/green evidence: 1 failed before the repair, then passed. |
+| Extra exploratory mypy including legacy test modules | Four pre-existing Pydantic-constructor annotation errors in `test_app.py` and `test_alembic_baseline.py`; outside the established V02 source-focused mypy scope and not changed as part of R2C. |
+
+### Current defects and environment blocks
+
+No V02 implementation **FAIL** remains in the requested Steps 04-07 scope.
+Docker/Compose is unavailable, so the actual rendered document, live MySQL
+health/connectivity, and baseline migration cycle remain **BLOCKED BY
+ENVIRONMENT** and must not be represented as PASS.
+
+An independent focused review found and then verified the repair for host
+`MYSQL_*` precedence at the Compose subprocess boundary. It found no remaining
+R2C defect. The historical `current-status.md` statement that rendering was
+already verified was contradicted by the original V02 evidence; the test is now
+correct, but live rendering is still blocked.
+
+---
+
+## Original verification - 2026-09-09
+
 Date: 2026-09-09
 
 Scope: Stage 1 Steps 04-07 only

@@ -14,12 +14,27 @@ from device_watch_server.db.base import Base
 
 pytestmark = pytest.mark.integration
 
+REQUIRED_DATABASE_ENVIRONMENT_WAS_CONFIGURED = all(
+    os.environ.get(name) is not None for name in ("DEVICE_WATCH_ENV", "DATABASE_URL")
+)
+
 
 def _database_url() -> str:
     value = os.environ.get("DATABASE_URL")
     if not value:
         pytest.skip("DATABASE_URL is not configured for integration testing")
     return value
+
+
+@pytest.mark.skipif(
+    not REQUIRED_DATABASE_ENVIRONMENT_WAS_CONFIGURED,
+    reason="database integration environment is not configured",
+)
+def test_configured_database_environment_survives_test_setup() -> None:
+    """Integration setup must retain externally supplied database settings."""
+
+    assert os.environ.get("DEVICE_WATCH_ENV") is not None
+    assert os.environ.get("DATABASE_URL") is not None
 
 
 def test_real_mysql_baseline_cycle() -> None:
