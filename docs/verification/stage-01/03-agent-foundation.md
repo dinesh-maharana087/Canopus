@@ -1,6 +1,37 @@
 # Stage 1 Verification V03 — Agent Foundation
 
-## R3A targeted repair re-verification (current)
+## R3B V03 regression re-verification (current)
+
+- Re-verification date: 2026-09-10.
+- Verification base: `a6a48ed`.
+- Scope: V03 regression verification after R3B; no agent source or test file
+  changed during R3B.
+- Overall current result: **PASS WITH ENVIRONMENT BLOCKS**.
+- Agent pytest, Ruff, mypy, and locked runtime dependency inspection all
+  passed from the repaired R3A state.
+- The runtime tree still contains only `device-watch-agent`; no collector,
+  sender, database, server, subprocess, or network dependency was introduced.
+- The known Windows process-signal environment block was not retried.
+- The consolidated Stage 1 baseline and V07 were not updated.
+
+### R3B V03 commands and results
+
+| Command | Result |
+| --- | --- |
+| `[uv] run --project agent --frozen --group test pytest agent/tests -q` | **PASS** - 27 passed in 0.10s |
+| `[uv] run --project agent --frozen --group test ruff check agent/src agent/tests` | **PASS** - all checks passed |
+| `[uv] run --project agent --frozen --group test mypy agent/src` | **PASS** - no issues in 9 source files |
+| `[uv] tree --project agent --no-dev --locked` | **PASS** - runtime tree contains only `device-watch-agent v0.1.0` |
+
+### Retained environment block
+
+- **BLOCKED BY ENVIRONMENT:** Real process-level SIGINT/SIGTERM handling remains
+  unavailable on this Windows `ProactorEventLoop`. Supported-loop registration
+  and requested-stop behavior remain covered by the passing agent tests.
+
+No current V03 implementation failure remains.
+
+## R3A targeted repair re-verification (prior repair evidence)
 
 - Re-verification date: 2026-09-10.
 - Repair base: `0726ae5`.

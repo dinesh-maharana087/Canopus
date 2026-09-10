@@ -1,6 +1,61 @@
 # Stage 1 Verification V04 — Frontend Foundation
 
-## Scope and result
+## R3B targeted repair re-verification (current)
+
+- Re-verification date: 2026-09-10.
+- Repair base: `a6a48ed`.
+- Scope: only V04-01 through V04-04 and the existing V04 frontend quality
+  gates.
+- Overall current result: **PASS WITH ENVIRONMENT BLOCKS**.
+- All four V04 implementation/coverage failures are repaired and exercised by
+  focused regression tests in this working tree.
+- No API client, business request, monitoring data, chart, count, status, or
+  Stage 2 user-interface behavior was added.
+- Agent V03 was rerun separately; server, deployment, Caddy, V05, V06, V07,
+  and the consolidated baseline were not modified.
+
+### Repaired findings
+
+| Finding | Result | Current evidence |
+| --- | --- | --- |
+| V04-01 - prohibited extra route-page content | **PASS** | `FoundationPage` now renders exactly one heading and the exact `Not implemented in Stage 1` message; all five literal routes assert the two-child page boundary and absence of the removed text |
+| V04-02 - non-reactive system theme | **PASS** | System mode now subscribes to the dark-scheme media query, reapplies light/dark on each change, and removes the listener when the mode changes or provider unmounts |
+| V04-03 - missing local Button primitive | **PASS** | `components/ui/Button.tsx` provides a typed native-button boundary with safe non-submitting default semantics, and `AppShell` uses it for the theme control |
+| V04-04 - incomplete regression coverage | **PASS** | Tests cover all five paths and exact messages, all five navigation links, per-route `aria-current`, absence of fabricated status/count text, complete theme cycling/persistence, and live system-theme changes |
+
+### R3B commands and results
+
+| Command | Result |
+| --- | --- |
+| Focused frontend tests before production repair | **FAIL as expected** - five route cases exposed the third page element, system-theme change stayed stale, and the required Button module was unresolved; 6 tests failed and 3 passed |
+| `npm.cmd --prefix web run test -- --run src/app/App.test.tsx src/theme/ThemeProvider.test.tsx src/components/ui/Button.test.tsx` | **PASS** - 3 files and 10 tests passed |
+| `npm.cmd --prefix web run test -- --run` | **PASS** - 3 files and 10 tests passed |
+| `npm.cmd --prefix web run typecheck` | **PASS** - strict TypeScript check exited zero |
+| `npm.cmd --prefix web run lint` | **PASS** - ESLint exited zero |
+| `npm.cmd --prefix web run build` | **PASS** - Vite transformed 81 modules and produced only `dist/index.html` plus one hashed CSS and one hashed JavaScript asset |
+| `node --version` | **BLOCKED BY ENVIRONMENT** for the supported-engine path - `v22.14.0` is below React Router's locked `>=22.22.0` requirement |
+
+### Retained environment blocks
+
+- **BLOCKED BY ENVIRONMENT:** The original in-app browser target was
+  unavailable. That previously established unavailable target was not retried.
+- **BLOCKED BY ENVIRONMENT:** The installed Node `v22.14.0` remains below the
+  locked React Router requirement of `>=22.22.0`. No system software was
+  installed or upgraded; all four frontend quality commands still passed.
+
+### Current source and regression locations
+
+- Exact route page: `web/src/pages/FoundationPage.tsx`.
+- Route/navigation coverage: `web/src/app/App.test.tsx`.
+- Reactive theme: `web/src/theme/ThemeProvider.tsx` and
+  `web/src/theme/ThemeProvider.test.tsx`.
+- Local primitive: `web/src/components/ui/Button.tsx` and
+  `web/src/components/ui/Button.test.tsx`.
+- Theme-control consumer: `web/src/components/layout/AppShell.tsx`.
+
+No current V04 implementation failure remains.
+
+## Original scope and result (historical)
 
 - Verification base: `4da340b20b82544e172ca88a83f0bbd7d772bdee`.
 - Scope: Stage 1 Step 10 only.

@@ -1,6 +1,7 @@
 import { Outlet } from "react-router";
 
 import { useTheme, type ThemeMode } from "../../theme/ThemeProvider";
+import { Button } from "../ui/Button";
 import { Navigation } from "./Navigation";
 
 const themeModes: ThemeMode[] = ["system", "light", "dark"];
@@ -16,14 +17,14 @@ export function AppShell() {
           <p className="brand-kicker">Infrastructure observability</p>
           <div className="brand">Device Watch</div>
         </div>
-        <button
+        <Button
           className="theme-button"
           type="button"
           aria-label={`Switch theme from ${mode} to ${nextMode}`}
           onClick={() => setMode(nextMode)}
         >
           Theme: {mode}
-        </button>
+        </Button>
       </header>
       <Navigation />
       <Outlet />

@@ -25,17 +25,24 @@ function readMode(): ThemeMode {
     : "system";
 }
 
-function resolvedTheme(mode: ThemeMode): "light" | "dark" {
-  if (mode !== "system") return mode;
-  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-}
-
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [mode, setMode] = useState<ThemeMode>(() => readMode());
 
   useEffect(() => {
     window.localStorage.setItem(STORAGE_KEY, mode);
-    document.documentElement.dataset.theme = resolvedTheme(mode);
+    if (mode !== "system") {
+      document.documentElement.dataset.theme = mode;
+      return;
+    }
+
+    const colorScheme = window.matchMedia("(prefers-color-scheme: dark)");
+    const applySystemTheme = () => {
+      document.documentElement.dataset.theme = colorScheme.matches ? "dark" : "light";
+    };
+
+    applySystemTheme();
+    colorScheme.addEventListener("change", applySystemTheme);
+    return () => colorScheme.removeEventListener("change", applySystemTheme);
   }, [mode]);
 
   const value = useMemo(() => ({ mode, setMode }), [mode]);
@@ -48,4 +55,3 @@ export function useTheme(): ThemeContextValue {
   if (!value) throw new Error("useTheme must be used within ThemeProvider");
   return value;
 }
-
