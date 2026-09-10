@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -35,6 +36,25 @@ def _network_names(service: dict[str, Any]) -> set[str]:
     return set(networks) if isinstance(networks, list) else set()
 
 
+def _named_volume_mounts(service: dict[str, Any]) -> set[tuple[str, str]]:
+    mounts: set[tuple[str, str]] = set()
+    for item in _list(service.get("volumes")):
+        if isinstance(item, str):
+            source, separator, target = item.partition(":")
+            if separator:
+                mounts.add((source, target))
+        elif (
+            isinstance(item, dict)
+            and item.get("type") == "volume"
+            and item.get("read_only") is not True
+        ):
+            dict_source = item.get("source")
+            dict_target = item.get("target")
+            if isinstance(dict_source, str) and isinstance(dict_target, str):
+                mounts.add((dict_source, dict_target))
+    return mounts
+
+
 def _assert(condition: bool, message: str) -> None:
     if not condition:
         raise TopologyError(message)
@@ -47,6 +67,10 @@ def validate_caddyfile(caddyfile: str) -> None:
     _assert("reverse_proxy server:8000" in caddyfile, "Caddy upstream must be server:8000")
     _assert("handle_path" not in caddyfile, "Caddy must not strip the API path")
     _assert("strip_prefix" not in caddyfile, "Caddy must not rewrite the API path")
+    _assert(
+        re.search(r"(?m)^[ \t]*rewrite(?:[ \t]+|$)", caddyfile) is None,
+        "Caddy must not rewrite the API path",
+    )
     _assert(caddyfile.count("{") == caddyfile.count("}"), "Caddyfile braces are unbalanced")
     _assert(caddyfile.count("reverse_proxy") == 1, "Caddy must define one API upstream")
 
@@ -76,13 +100,28 @@ def validate_topology(rendered: dict[str, Any], caddyfile: str) -> list[str]:
         _assert(set(_list(server.get("cap_drop"))) == {"ALL"}, "server must drop all capabilities")
         _assert(_list(caddy.get("cap_add")) == ["NET_BIND_SERVICE"], "Caddy may add only NET_BIND_SERVICE")
         _assert(not _list(server.get("cap_add")), "server must not retain capabilities")
-        _assert(set(caddy.get("volumes", [])) == {"caddy_data:/data", "caddy_config:/config"}, "Caddy state volumes are incorrect")
+        caddy_volumes = _list(caddy.get("volumes"))
+        _assert(
+            len(caddy_volumes) == 2
+            and _named_volume_mounts(caddy)
+            == {("caddy_data", "/data"), ("caddy_config", "/config")},
+            "Caddy state volumes are incorrect",
+        )
         _assert(_network_names(caddy) == {"device_watch_prod"} and _network_names(server) == {"device_watch_prod"}, "services must share one production network")
         _assert(rendered.get("networks", {}).get("device_watch_prod", {}).get("internal") is not True, "production network must reach external services")
         _assert(server.get("environment", {}).get("DEVICE_WATCH_ENV") == "production", "server must run in production mode")
         _assert(any("host.docker.internal:host-gateway" == item for item in _list(server.get("extra_hosts"))), "server requires the host gateway mapping")
         secrets = server.get("secrets", [])
-        _assert(any((item.get("target") == "mysql-ca.pem" and item.get("mode") in ("0444", 444)) for item in secrets if isinstance(item, dict)), "server requires a read-only CA secret mount")
+        _assert(
+            any(
+                item.get("source") == "mysql_ca"
+                and item.get("target") == "mysql-ca.pem"
+                and item.get("mode") == "0444"
+                for item in secrets
+                if isinstance(item, dict)
+            ),
+            "server requires a read-only CA secret mount",
+        )
         _assert("mysql_ca" in rendered.get("secrets", {}), "production CA secret is missing")
         validate_caddyfile(caddyfile)
     except (KeyError, TypeError, AttributeError, TopologyError) as exc:

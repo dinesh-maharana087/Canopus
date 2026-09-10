@@ -1,5 +1,47 @@
 # Stage 1 Verification V05 — Deployment topology
 
+## R4A targeted repair re-verification (current)
+
+- Re-verification date: 2026-09-10.
+- Repair base: `41ae798`.
+- Scope: only V05-01 through V05-04 and the affected static deployment checks.
+- Current result: **PASS WITH ENVIRONMENT BLOCKS**.
+- All four deterministic V05 failures are repaired and covered by focused
+  regression tests.
+- Docker was checked once and remains unavailable. Compose rendering, image
+  builds, packaged Caddy validation, runtime routing, health checks, and secret
+  mount inspection were not attempted and remain **BLOCKED BY ENVIRONMENT**.
+- V07 and the consolidated Stage 1 baseline were not updated because no Stage 1
+  acceptance classification changed in this repair batch.
+
+### Repaired findings
+
+| Finding | Result | Current evidence |
+| --- | --- | --- |
+| V05-01 - invalid production TLS separators | **PASS** | `deploy/.env.prod.example` now uses literal `&` query separators, and the example database value constructs the real production `Settings` model successfully. |
+| V05-02 - rendered volume objects | **PASS** | The valid fixture now mirrors rendered `{type, source, target}` mounts. The verifier requires exactly the two writable named Caddy mounts and rejects extra, malformed, or read-only entries. |
+| V05-03 - unbound CA secret source | **PASS** | The server secret check now jointly requires source `mysql_ca`, target `mysql-ca.pem`, and canonical rendered mode `"0444"`; wrong source and writable-mode regressions pass. |
+| V05-04 - accepted Caddy rewrite | **PASS** | The text verifier now rejects a line-level `rewrite` directive in addition to `handle_path` and `strip_prefix`; the explicit rewrite regression passes. |
+
+### R4A commands and results
+
+| Command/check | Result |
+| --- | --- |
+| Existing production topology tests before new coverage | **PASS** - 4 passed, confirming the original suite did not expose V05-01 through V05-04. |
+| First R4A regression run before production fixes | **FAIL as expected** - 5 failed and 2 passed; the four requested defects failed directly, and one existing network assertion was masked by the earlier rendered-volume error. |
+| Reviewer-hardening regressions before their verifier correction | **FAIL as expected** - extra bind mount, read-only Caddy state mount, and decimal mode `444` were all accepted. |
+| Focused V05 pytest over production, development-topology, and development-MySQL tests | **PASS WITH ENVIRONMENT BLOCK** - 12 passed and the one Compose-rendering test skipped because Docker is unavailable. |
+| Focused Ruff over `verify_topology.py` and the production topology tests | **PASS** - all checks passed. |
+| Focused mypy over `verify_topology.py` | **PASS** - no issues found. |
+| `python -m py_compile deploy/verify_topology.py` in the locked server environment | **PASS**. |
+| Independent deployment/security review and correction review | **PASS** - no Critical or Important issue remains. |
+
+No current V05 implementation **FAIL** remains. This section supersedes the
+original result below for the current repository state; the original evidence
+is retained as historical defect and environment-block documentation.
+
+## Original verification (historical)
+
 Date: 2026-09-09  
 Scope: Stage 1 Steps 11–14 only  
 Overall result: **FAIL**
