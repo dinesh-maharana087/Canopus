@@ -30,10 +30,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         finally:
             engine.dispose()
     except (SettingsError, RuntimeError, OSError, ValueError):
-        print("Database check failed", file=sys.stderr)
+        print("database connectivity: unavailable", file=sys.stderr)
         return 1
 
-    print("Database is ready")
+    print("database connectivity: ok")
     return 0
 
 

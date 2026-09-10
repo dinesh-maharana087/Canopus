@@ -2,11 +2,7 @@
 
 from __future__ import annotations
 
-import logging
-
 from sqlalchemy import Engine, text
-
-logger = logging.getLogger("device_watch_server.db")
 
 
 def check_database(engine: Engine) -> None:
@@ -16,7 +12,6 @@ def check_database(engine: Engine) -> None:
         with engine.connect() as connection:
             connection.execute(text("SELECT 1"))
     except Exception as exc:
-        logger.warning("database unavailable", extra={"event": "database_unavailable"})
         raise RuntimeError("database unavailable") from exc
 
 

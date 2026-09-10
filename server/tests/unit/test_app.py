@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import logging
+
+from fastapi import APIRouter
 from fastapi.testclient import TestClient
 
 import device_watch_server.app as app_module
@@ -19,6 +22,23 @@ def make_settings(environment: str = "test") -> Settings:
         device_watch_env=environment,
         database_url=database_url,
     )
+
+
+def test_factory_includes_the_versioned_api_router(monkeypatch) -> None:
+    test_router = APIRouter()
+
+    @test_router.get("/api/v1/router-probe")
+    def router_probe() -> dict[str, str]:
+        return {"source": "api-router"}
+
+    monkeypatch.setattr(app_module, "api_router", test_router, raising=False)
+    app = app_module.create_app(make_settings(), database_check=lambda: None)
+
+    with TestClient(app) as client:
+        response = client.get("/api/v1/router-probe")
+
+    assert response.status_code == 200
+    assert response.json() == {"source": "api-router"}
 
 
 def test_liveness_returns_process_status_without_calling_database() -> None:
@@ -70,10 +90,36 @@ def test_readiness_returns_generic_503_when_database_check_fails() -> None:
     assert "mysql" not in response.text.lower()
 
 
+def test_readiness_logs_one_fixed_sanitized_failure_event(caplog) -> None:
+    def fake_database_check() -> None:
+        raise RuntimeError("database secret://private-user:private-pass@db/device_watch")
+
+    app = app_module.create_app(make_settings(), database_check=fake_database_check)
+    health_logger = logging.getLogger("device_watch_server.api.health")
+    health_logger.addHandler(caplog.handler)
+
+    try:
+        with TestClient(app) as client:
+            response = client.get("/api/v1/health/ready")
+    finally:
+        health_logger.removeHandler(caplog.handler)
+
+    failure_records = [
+        record
+        for record in caplog.records
+        if getattr(record, "event", None) == "database_readiness_failed"
+    ]
+    assert response.status_code == 503
+    assert len(failure_records) == 1
+    assert failure_records[0].exc_info is None
+    assert "private-user" not in failure_records[0].getMessage()
+    assert "private-pass" not in failure_records[0].getMessage()
+
+
 def test_only_stage_one_health_routes_are_registered() -> None:
     app = app_module.create_app(make_settings())
 
-    paths = {route.path for route in app.routes if hasattr(route, "path")}
+    paths = set(app.openapi()["paths"])
 
     assert paths == {"/api/v1/health/live", "/api/v1/health/ready"}
 

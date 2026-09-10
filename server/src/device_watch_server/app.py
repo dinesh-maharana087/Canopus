@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from sqlalchemy.engine import Engine
 
-from device_watch_server.api.health import HealthResponse, live, ready
+from device_watch_server.api.router import api_router
 from device_watch_server.core.config import Settings, load_settings
 from device_watch_server.core.logging import setup_logging
 from device_watch_server.core.middleware import RequestLoggingMiddleware
@@ -54,8 +54,7 @@ def create_app(
     )
     app.add_middleware(RequestLoggingMiddleware)
     app.state.database_check = database_check or default_database_check
-    app.add_api_route("/api/v1/health/live", live, methods=["GET"], response_model=HealthResponse)
-    app.add_api_route("/api/v1/health/ready", ready, methods=["GET"], response_model=HealthResponse)
+    app.include_router(api_router)
     return app
 
 

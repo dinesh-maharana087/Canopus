@@ -112,7 +112,6 @@ class JSONFormatter(logging.Formatter):
         extras = {
             "event",
             "method",
-            "path",
             "normalized_path",
             "status",
             "duration_ms",
@@ -150,12 +149,10 @@ def setup_logging() -> logging.Logger:
             logger.removeHandler(handler)
         handler = CurrentStdoutHandler(sys.stdout)
         handler.setFormatter(JSONFormatter())
-        handler.terminator = ""
         logger.addHandler(handler)
     else:
         handler = CurrentStdoutHandler(sys.stdout)
         handler.setFormatter(JSONFormatter())
-        handler.terminator = ""
         logger.addHandler(handler)
     return logger
 

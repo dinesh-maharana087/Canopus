@@ -13,6 +13,12 @@ from starlette.responses import Response
 logger = logging.getLogger("device_watch_server.requests")
 
 
+def _normalized_route_path(request: Request) -> str:
+    route = request.scope.get("route")
+    path = getattr(route, "path", None)
+    return path if isinstance(path, str) else "<unmatched>"
+
+
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
     """Log request metadata without emitting secrets or request bodies."""
 
@@ -22,7 +28,6 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         call_next: Callable[[Request], Awaitable[Response]],
     ) -> Response:
         start = time.perf_counter()
-        path = request.url.path
         method = request.method
         status_code = 500
 
@@ -34,8 +39,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
                 extra={
                     "event": "http_request",
                     "method": method,
-                    "path": path,
-                    "normalized_path": path,
+                    "normalized_path": _normalized_route_path(request),
                     "status": status_code,
                     "duration_ms": int((time.perf_counter() - start) * 1000),
                 },
@@ -47,8 +51,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
                 extra={
                     "event": "http_request",
                     "method": method,
-                    "path": path,
-                    "normalized_path": path,
+                    "normalized_path": _normalized_route_path(request),
                     "status": status_code,
                     "duration_ms": int((time.perf_counter() - start) * 1000),
                 },

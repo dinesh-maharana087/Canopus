@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Literal
 
 from fastapi import APIRouter, Request
@@ -9,6 +10,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 router = APIRouter()
+logger = logging.getLogger("device_watch_server.api.health")
 
 
 class HealthResponse(BaseModel):
@@ -32,5 +34,9 @@ def ready(request: Request) -> HealthResponse | JSONResponse:
     try:
         database_check()
     except RuntimeError:
+        logger.warning(
+            "database readiness failed",
+            extra={"event": "database_readiness_failed"},
+        )
         return JSONResponse(status_code=503, content={"status": "unavailable"})
     return HealthResponse(status="ok")
