@@ -1,51 +1,18 @@
-.ai-memory/
-.env
-.env.*
-!.env.example
-!.env.*.example
-*.pem
-*.key
-.venv/
-__pycache__/
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-node_modules/
-dist/
-coverage/
-.coverage
+
 
 # ctags
 tags
 TAGS
 
-# Local databases
-*.db
-*.db-*
-*.sqlite
-*.sqlite-*
-*.sqlite3
-*.sqlite3-*
 
 # Editor artifacts
 .idea/
 .vscode/
-
-.worktrees/
-.superpowers/
-.tmp/
-.git.codex-generated/
-
 
 
 # IDE
 .vscode/
 .idea/
 
-# Temporary AI/tool files
-.tmp/
-.ai-memory/
-.git.codex-generated/
 
-# Logs
-*.log
+
