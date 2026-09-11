@@ -15,6 +15,10 @@ dist/
 coverage/
 .coverage
 
+# ctags
+tags
+TAGS
+
 # Local databases
 *.db
 *.db-*
