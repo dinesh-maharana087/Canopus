@@ -1,5 +1,35 @@
 # Stage 1 Verification V05 — Deployment topology
 
+## R4C deployment-documentation re-verification (current)
+
+- Re-verification date: 2026-09-11.
+- Repair base: `60db4a8` plus the R4C worktree changes.
+- Scope: current deployment guidance and the V05 checks only.
+- Current V05 result: **PASS WITH ENVIRONMENT BLOCKS**.
+- `deploy/.env.prod.example` remains a checked-in template whose TLS URL is
+  valid after R4A. Operational commands now use the ignored operator-managed
+  `deploy/.env.prod` file instead of running with example values.
+- Docker availability was checked once. The CLI remains unavailable, so no
+  Compose rendering, image build, packaged Caddy validation, container health,
+  runtime routing, or secret-mount inspection was attempted.
+
+### R4C V05 commands and results
+
+| Command/check | Result |
+| --- | --- |
+| Docker availability | **BLOCKED BY ENVIRONMENT** - Docker CLI unavailable. |
+| Focused production/development deployment tests | **PASS WITH ENVIRONMENT BLOCK** - 12 passed and the one Docker-dependent Compose-rendering test skipped. |
+| Focused Ruff over the V05 verifier and deployment tests | **PASS** - all checks passed. |
+| Focused mypy over `deploy/verify_topology.py` | **PASS** - no issues found. |
+| `python -m py_compile deploy/verify_topology.py` in the locked server environment | **PASS**. |
+| Operator environment-file ignore check | **PASS** - `git check-ignore` maps `deploy/.env.prod` to the repository `.env.*` rule. |
+| Deployment command review | **PASS** - the checked-in example is identified only as a template; render, verification, build, start, inspection, log, and stop commands use `deploy/.env.prod`. |
+
+R4A's four deterministic verifier/configuration repairs remain passing. This
+R4C section supersedes no historical Stage 1 statement and does not convert any
+Docker-dependent check to PASS. V07 and the consolidated baseline were not
+updated, as explicitly required for this repair batch.
+
 ## R4A targeted repair re-verification (current)
 
 - Re-verification date: 2026-09-10.

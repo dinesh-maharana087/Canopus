@@ -1,6 +1,6 @@
 # Architecture
 
-Stage 1 keeps the native agent, FastAPI server, and React web application as independent projects. Caddy is the only public production ingress.
+The Stage 1 foundation keeps the native agent, FastAPI server, and React web application as independent projects. The current repository adds partial Stage 2 server-side device identity and enrollment-bootstrap foundations without changing the production topology. Caddy remains the only public production ingress.
 
 ```text
 Remote Agent
@@ -24,4 +24,4 @@ Remote Agent
 - The production Compose network contains exactly Caddy and FastAPI. The server command trusts forwarded headers from the private network; any topology change requires narrowing that trust instead of retaining a wildcard.
 - Linux production Compose supplies `host.docker.internal:host-gateway` for deployments whose external database is on the Docker host. `localhost` inside the server container means the container itself and does not reach the host database.
 
-The schema-empty Alembic baseline records migration state without business tables. The agent registry is empty and its contracts are testable without a concrete collector. The web routes are empty Stage 1 boundaries without API calls or fabricated monitoring data.
+The historical Stage 1 Alembic revision `20260831_0001` records migration state without business tables. The current migration head extends that baseline with the Stage 2 `devices` and `enrollment_bootstraps` tables. Current Stage 2 server code also contains typed device/bootstrap contracts and bootstrap cryptography, persistence, and lifecycle services, but no public enrollment, heartbeat, or device API route exists yet. The agent registry remains empty without a concrete collector or sender, and the web retains its Stage 1 route boundaries without business API calls or fabricated monitoring data.

@@ -32,7 +32,7 @@ PowerShell:
 
 ```powershell
 uv sync --project server --frozen
-$env:DEVICE_WATCH_ENV = 'test'
+$env:DEVICE_WATCH_ENV = 'development'
 $env:DATABASE_URL = 'mysql+pymysql://<user>:<password>@127.0.0.1:3307/device_watch'
 uv run --project server uvicorn device_watch_server.main:app --reload
 uv run --project server pytest server/tests/unit -q
@@ -47,7 +47,7 @@ POSIX shell:
 
 ```sh
 uv sync --project server --frozen
-export DEVICE_WATCH_ENV=test
+export DEVICE_WATCH_ENV=development
 export DATABASE_URL='mysql+pymysql://<user>:<password>@127.0.0.1:3307/device_watch'
 uv run --project server uvicorn device_watch_server.main:app --reload
 uv run --project server pytest server/tests/unit -q
@@ -58,7 +58,7 @@ uv run --project server alembic -c server/alembic.ini upgrade head
 uv run --project server alembic -c server/alembic.ini current
 ```
 
-The server requires `DEVICE_WATCH_ENV` and `DATABASE_URL`; it has no development-database fallback. Stage 1 exposes only `GET /api/v1/health/live` and `GET /api/v1/health/ready`.
+The server requires `DEVICE_WATCH_ENV` and `DATABASE_URL`; it has no development-database fallback. At Stage 1 completion, the server exposed only `GET /api/v1/health/live` and `GET /api/v1/health/ready`. The current partial Stage 2 foundation has not added a public enrollment, heartbeat, or device API route.
 
 ## Web
 

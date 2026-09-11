@@ -7,6 +7,45 @@ Overall result: **FAIL**
 
 The current repository tree was verified as-is. Source code was not modified. The locked Python environment could not be invoked inside the sandbox, and the required external-access request was rejected because the workspace approval service was out of credits. Consequently, the fresh repository-verifier and audit-test executions are classified as **BLOCKED BY ENVIRONMENT**; they were not retried through another execution path.
 
+## R4C targeted documentation re-verification - 2026-09-11
+
+Base revision: `60db4a8` plus the R4C worktree changes.
+
+Repair scope: stale current-state/future-contract wording, native server
+development mode, production environment-file guidance, and V06
+re-verification only.
+
+R4C documentation repair result: **PASS**.
+
+Overall V06 result: **FAIL** remains unchanged because the current repository
+still contains the three SQLite test-engine implementations reported by the
+positive database allowlist. R4C does not alter those Stage 2 tests.
+
+| R4C contract | Result | Current evidence |
+| --- | --- | --- |
+| Historical Stage 1 versus current repository state | **PASS** | README and architecture wording now identify the Stage 1 completion scope as historical while describing the current partial Stage 2 server foundation separately. Approved Stage 1 specifications, plans, progress history, and original verification evidence were not rewritten. |
+| Staged/future capability wording | **PASS** | `docs/future-contracts.md` preserves the required ordered sequence, identifies the implemented device/bootstrap contracts, `devices` and `enrollment_bootstraps` tables, and bootstrap lifecycle services, and keeps public enrollment, stable device credentials, heartbeat/connectivity, monitoring/history, evaluation, and alerts explicitly future. |
+| Native server development mode | **PASS** | Both PowerShell and POSIX native Uvicorn workflows now set `DEVICE_WATCH_ENV=development`; the optional MySQL integration-test workflow still sets `test`. All 11 focused settings tests pass. |
+| Production environment-file guidance | **PASS** | `deploy/.env.prod.example` is documented only as a template. Actual production commands use the ignored operator-managed `deploy/.env.prod` path, whose ignore behavior was confirmed with `git check-ignore`. |
+| R4B repository-audit implementation | **PASS** | All 9 focused audit tests pass. The current-scope audit reports only the three known SQLite test modules and no credential/private-key finding; documentation consistency was inspected separately. Historical Stage 1 scope also reports the current Stage 2 migrations/modules, as designed. |
+
+### R4C V06 commands and results
+
+| Command/check | Result |
+| --- | --- |
+| `pytest deploy/tests/test_verify_repository.py -q` | **PASS** - 9 passed. |
+| `pytest server/tests/unit/test_config.py -q` | **PASS** - 11 passed. |
+| Focused Ruff | **PASS** - all checks passed. |
+| Focused mypy | **PASS** - no issues found in the two checked source files. |
+| `python -m py_compile deploy/verify_repository.py` | **PASS**. |
+| `python deploy/verify_repository.py --scope current` | **FAIL (known current content)** - exactly the three existing SQLite test-engine modules were reported. |
+| `python deploy/verify_repository.py --scope stage-one` | **FAIL (expected scope distinction)** - the current Stage 2 migrations/modules and the same SQLite tests were reported. R4B's unchanged archived-Stage-1 PASS evidence remains valid. |
+
+The original V06-03 documentation inconsistency, V06-04, and V06-05 are
+repaired for the current tree. The retained original sections below remain
+historical evidence. V07 and the consolidated Stage 1 baseline were not
+updated, as explicitly required for R4C.
+
 ## R4B targeted repair re-verification - 2026-09-11
 
 Base revision: `0ee27bb988733e0c05dd814244f171d8360f8d1a` plus the R4B worktree changes.
