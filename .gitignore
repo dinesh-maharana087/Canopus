@@ -35,3 +35,17 @@ TAGS
 .superpowers/
 .tmp/
 .git.codex-generated/
+
+
+
+# IDE
+.vscode/
+.idea/
+
+# Temporary AI/tool files
+.tmp/
+.ai-memory/
+.git.codex-generated/
+
+# Logs
+*.log
