@@ -1,5 +1,128 @@
 # Stage 1 Verification V07 - Acceptance review
 
+## Current acceptance re-review - 2026-09-11
+
+Scope: Stage 1 acceptance review only
+
+Revision reviewed: `5897e2daaa4bf0f02724fd3d2dad498fe98157de` plus this V07 evidence update
+
+Overall result: **FAIL**
+
+Acceptance totals: **7 PASS, 2 FAIL, 7 BLOCKED BY ENVIRONMENT**.
+
+This re-review maps all sixteen approved acceptance criteria at
+`docs/superpowers/specs/2026-08-31-device-watch-stage-1-design.md:372-389`
+to the latest V01-V06 evidence. The consolidated Stage 1 baseline was read only
+as historical context and was not updated. No broad source audit or existing
+test matrix was rerun.
+
+V01's current addendum describes the pre-repair `91a52e0` checkout even though
+the subsequent `b6cda56` commit contains the R1 settings and regression-test
+repairs. That left an evidence gap for criteria 1 and 9. The only functional
+command run for this review was the focused current-tree V01 regression suite;
+all 16 configuration and engine tests passed, including the documented
+uppercase environment-name and pool-option regressions. Later V02 application
+factory evidence supplies the corresponding boot behavior. No other fresh,
+valid V01-V06 test evidence was repeated.
+
+### Evidence reviewed
+
+- V01: `01-repository-server-foundation.md` - Steps 01-03, including its
+  pre-repair limitation and the focused evidence-gap check described above.
+- V02: `02-server-database-migrations.md` - current R2A-R2C re-verification.
+- V03: `03-agent-foundation.md` - current R3A/R3B re-verification.
+- V04: `04-frontend-foundation.md` - current R3B re-verification.
+- V05: `05-deployment-topology.md` - current R4A/R4C re-verification.
+- V06: `06-security-documentation.md` - current R4B/R4C re-verification.
+- The approved Stage 1 acceptance criteria and Step 17 acceptance card.
+- `stage-01-baseline.md` for historical context only.
+
+### Current acceptance mapping
+
+| # | Stage 1 acceptance criterion | Classification | Latest verification evidence and decision |
+| --- | --- | --- | --- |
+| 1 | The backend boots with valid configuration. | **PASS** | The focused V01 evidence-gap run passed all 16 current configuration/engine tests, including case-sensitive loading of documented uppercase environment names. V02's current application-factory and lifecycle regressions pass with valid settings. |
+| 2 | The backend validates connectivity to configured MySQL. | **BLOCKED BY ENVIRONMENT** | V02 verifies that readiness and the database-check CLI execute `SELECT 1`, report generic outcomes, dispose the engine, and redact secrets without network access. Docker/MySQL remained unavailable, so actual configured MySQL connectivity was not established. |
+| 3 | Alembic applies, reverses, and reapplies the baseline against MySQL 8.x. | **BLOCKED BY ENVIRONMENT** | V02 reports all deterministic Alembic URL/TLS, percent-encoding, script-resolution, metadata, and integration-fixture defects repaired. The real MySQL `upgrade -> base -> upgrade` cycle remains unexecuted because Docker/MySQL is unavailable. |
+| 4 | The agent boots and shuts down cleanly. | **PASS** | V03 records 27 passing agent tests and verified requested-stop, cancellation, cleanup, and supported-loop signal callback behavior. The separate real Windows process-signal check remains environment-limited but does not negate the directly tested clean lifecycle. |
+| 5 | Collector contracts and registry are testable without real collection. | **PASS** | V03's current suite passes the repaired public mapping, duplicate-name, interval, registry, and lifecycle regressions while retaining an empty registry and no concrete collector, sender, network, server, subprocess, or database coupling. |
+| 6 | The frontend shell tests, type-checks, and builds. | **PASS** | V04 records 10 passing tests plus successful strict type-check, lint, and production build commands. The supported-Node and in-app-browser checks remain separately environment-limited. |
+| 7 | Caddy configuration validates. | **BLOCKED BY ENVIRONMENT** | V05's repaired static Caddy checks pass, but Docker/Caddy is unavailable, so the packaged `caddy validate` command and runtime validation were not executed. |
+| 8 | Development and production Compose configurations validate. | **BLOCKED BY ENVIRONMENT** | V02/V05 record passing static and rendered-shape regression coverage, including the repaired renderer-facing verifier. Docker Compose is unavailable, so actual development and production rendering was not executed. |
+| 9 | Automated tests pass independently. | **BLOCKED BY ENVIRONMENT** | All available current component suites recorded by V01-V06 pass, including this review's 16-test V01 gap check. The required Docker-dependent Compose-rendering test remains skipped, the real MySQL integration path remains unavailable, and the frontend host is below the locked supported Node version; therefore the criterion has no proved failure but cannot receive an unqualified PASS. |
+| 10 | MySQL is the only database implementation represented in the project. | **FAIL** | V06's repaired positive allowlist reports exactly three current SQLite engine implementations: `server/tests/unit/test_bootstrap_cli.py`, `server/tests/unit/test_bootstrap_repository.py`, and `server/tests/unit/test_bootstrap_service.py`. The production runtime remains MySQL/PyMySQL-only, but this criterion is repository-wide. |
+| 11 | No fake or partial Stage 2 workflow exists. | **FAIL** | V06 confirms that the current tree contains two later Stage 2 migrations and six device/bootstrap domain and enrollment modules. The historical Stage 1 snapshot passes the Stage 1 absence audit, and no agent/frontend fake workflow was found, but the current repository still contains a partial Stage 2 server foundation. |
+| 12 | Only Caddy publishes production host ports. | **PASS** | V05's repaired static verifier and focused tests confirm exactly Caddy and server in production, with only Caddy publishing `80/443` and FastAPI limited to internal port `8000`. Actual Compose rendering remains covered by criterion 8's environment block. |
+| 13 | Missing production domain or database configuration fails clearly. | **BLOCKED BY ENVIRONMENT** | V01 verifies required database settings and sanitized validation. V05 verifies required Compose interpolation statically, but Docker Compose is unavailable, so the missing-domain and missing-database render failures were not executed. |
+| 14 | Production settings reject an unverified MySQL connection. | **PASS** | The focused V01 gap run passes the current production TLS regressions, which require the exact CA path and true certificate/identity verification flags and reject duplicate, additional, false, or incorrect values before engine creation. V02 also passes the validated Alembic TLS boundary. |
+| 15 | The packaged proxy preserves `/api` and targets `server:8000`. | **BLOCKED BY ENVIRONMENT** | V05's source verifier now rejects rewrite directives and confirms path-preserving `/api/* -> server:8000`. Docker/Caddy is unavailable, so image construction, packaged validation, and runtime proxy routing remain unexecuted. |
+| 16 | Production Compose mounts the configured CA file read-only at `/run/secrets/mysql-ca.pem`. | **PASS** | V05's repaired verifier and focused tests jointly require secret source `mysql_ca`, target `mysql-ca.pem`, canonical mode `0444`, and the exact in-container CA path. Runtime secret-mount inspection remains environment-limited but does not negate the verified checked-in Compose contract. |
+
+### Current contradiction and boundary review
+
+- **V01 pre-repair addendum versus the current tree:** the addendum records
+  `91a52e0`; commit `b6cda56` then changed the settings implementation and the
+  two focused test files in the same checkpoint. The targeted 16-test run above
+  closes only the resulting acceptance evidence gap and does not rewrite V01.
+- **Historical Stage 1 versus current Stage 2 work:** V06 proves the archived
+  Stage 1 snapshot passes the historical absence audit. Criteria 10 and 11 are
+  nevertheless current-repository criteria and retain the detected SQLite and
+  partial Stage 2 failures. Later approved work is not relabeled as historical
+  Stage 1 content.
+- **Static deployment evidence versus runtime evidence:** criteria 12 and 16
+  are satisfied by the repaired checked-in topology contracts. Criteria 7, 8,
+  13, and 15 require unavailable Docker/Caddy behavior and remain blocked.
+- **Passing available tests versus complete automated evidence:** criterion 9
+  is blocked, not failed, because no current automated test failure is recorded
+  but required environment-dependent paths remain unexecuted.
+
+### Environment blocks retained
+
+No Docker, Compose, Caddy, container, MySQL, browser, supported-Node, or real
+process-signal check was retried in V07. The acceptance-controlling blocks are:
+
+- real configured MySQL connectivity (criterion 2);
+- the real MySQL baseline migration cycle (criterion 3);
+- packaged Caddy validation (criterion 7);
+- development and production Compose rendering (criterion 8);
+- complete environment-dependent automated-test execution (criterion 9);
+- live missing-production-variable rendering (criterion 13); and
+- packaged and runtime proxy behavior (criterion 15).
+
+The real Windows agent process-signal check, supported-Node/browser frontend
+checks, container health, image inspection, and runtime CA mount inspection also
+remain environment-limited within their recorded scopes. They are not presented
+as successful runtime evidence.
+
+### V07 commands and evidence integrity
+
+Only evidence reads, Git history/status inspection, and one focused gap-closing
+test command were performed. The focused command was:
+
+```text
+[workspace uv] run --project server --frozen --group test \
+  pytest server/tests/unit/test_config.py \
+  server/tests/unit/test_engine_tls.py -q
+# PASS - 16 passed in 0.73s
+```
+
+The first sandboxed launch could not access the existing host Python executable;
+the identical frozen, offline command then ran with approved host-interpreter
+access. No package was downloaded or installed. No agent, broader server,
+frontend, deployment, Docker, Caddy, MySQL, or repository-audit test was rerun.
+
+### Current acceptance conclusion
+
+Stage 1 does not currently satisfy acceptance. Criteria 10 and 11 are the exact
+remaining deterministic failures, and seven additional criteria retain legitimate
+environment blocks. This updated V07 mapping is ready to feed a separately
+authorized final baseline regeneration, but Stage 1 is not ready to be declared
+an accepted or safe baseline while those failures remain.
+
+---
+
+## Original acceptance review - 2026-09-09 (historical)
+
 Date: 2026-09-09  
 Scope: Stage 1 acceptance review only  
 Revision reviewed: `a366a8bf7fa2379ac0a3dfac9fda71ce1850abc1`  
