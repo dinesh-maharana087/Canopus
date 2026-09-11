@@ -7,6 +7,221 @@ Overall result: **FAIL**
 
 The current repository tree was verified as-is. Source code was not modified. The locked Python environment could not be invoked inside the sandbox, and the required external-access request was rejected because the workspace approval service was out of credits. Consequently, the fresh repository-verifier and audit-test executions are classified as **BLOCKED BY ENVIRONMENT**; they were not retried through another execution path.
 
+## R5A re-verification with installed test tools - 2026-09-11
+
+Scope: criterion 10 only, against `3554078` plus the existing R5A repair.
+No implementation or test change was made in this verification session.
+
+**MySQL-only database boundary: PASS. Full requested R5A verification: FAIL.**
+Criterion 10 cannot yet be closed as an unqualified verified PASS under the
+requested checks: CLI test collection fails, and focused strict mypy reports
+both pre-existing defects and R5A typing regressions. These are deterministic
+failures, not environment blocks. The earlier tool-availability blocks below
+are now historical.
+
+The existing `server/.venv` is executable with approved host access. Verified
+versions are Python 3.12.10, pytest 9.1.1, Ruff 0.16.4, mypy 2.3.1,
+SQLAlchemy 2.0.52, and PyMySQL 1.2.0. No packages were installed or updated.
+
+### Executed checks
+
+All paths below are relative to the repository root. Python commands use
+`server/.venv/Scripts/python.exe`.
+
+| Check | Classification | Result |
+| --- | --- | --- |
+| Combined three bootstrap test modules | **FAIL** | Exit 1: one collection error at `server/tests/unit/test_bootstrap_cli.py:22`, `ImportError: cannot import name 'cli' from 'device_watch_server.enrollment'`. Collection stopped before test execution. |
+| Repository and service modules separately | **PASS** | Exit 0: **35 passed**, no failures or skips. This preserves independent evidence after the unrelated CLI module prevented combined collection. |
+| Ruff on all three modules | **PASS** | Exit 0: all checks passed. |
+| Strict mypy with local source resolution | **FAIL** | Exit 1: **12 errors in 2 files (3 checked)**. Repository test: no diagnostics. CLI test: 5 diagnostics. Service test: 7 diagnostics. Details and provenance follow. |
+| Current repository/database audit | **PASS** | `deploy/verify_repository.py --scope current` exited 0 with zero findings. It was repeated once after a new untracked `deploy/version.env` appeared; the result remained exit 0 with zero findings. |
+| SQLite source/database boundary | **PASS** | The scoped SQLite source scan still reports only negative fixtures in `deploy/tests/test_verify_repository.py`. The three affected tests contain no SQLite engines. The verifier's exact `mysql+pymysql` allowlist, runtime configuration, and frozen dependency files remain unchanged; the earlier valid frozen dependency-tree evidence is retained. |
+
+### Findings and exact verification impact
+
+- **Pre-existing missing CLI module:** line 22 prevents collection of the
+  CLI test module, including all ten parameter-expanded cases, and aborts a
+  normal combined run of the three modules. The separate repository/service
+  run above passes. History inspection previously established that the import
+  and missing module both predate R5A at `c68b1cb`; current inspection confirms
+  the module is still absent. Source-aware mypy also reports `[attr-defined]`
+  for this missing import.
+- **Pre-existing missing console entry point:** `server/pyproject.toml`
+  still declares only `device-watch-db-check`, while the CLI console test
+  requires `device-watch-bootstrap`. That test body was not reached because
+  of the module collection error. Neither contract was implemented or skipped.
+- **R5A typing regressions:** the newly added `ignore[arg-type]` at
+  `test_bootstrap_cli.py:105` produces `[unused-ignore]`; the underlying
+  `[call-overload]` at that create print wrapper predates R5A. The entire revoke
+  print wrapper at line 257 is new in R5A and produces both `[call-overload]`
+  and `[unused-ignore]`. The ignore code does not match the overloaded
+  `print` call diagnostic. These findings remain unrepaired in this
+  verification-only session.
+- **Pre-existing service-test typing errors:** `test_bootstrap_service.py`
+  lines 115, 119, and 136 pass `str` where mypy expects `SecretStr`; lines 120
+  and 137 pass `str` where it expects `SecretStr | None`; lines 355 and 457
+  report `Cannot infer type of lambda [misc]`. The corresponding settings
+  calls and default-argument lambdas were unchanged by R5A.
+
+The initial bare mypy invocation returned 18 diagnostics because the installed
+server package lacks a `py.typed` marker, obscuring local imports with
+`[import-untyped]` errors. Re-running only the same three files with
+`MYPYPATH=D:/canopus/Canopus/server/src` resolves their local source and yields
+the actionable 12-diagnostic result above. No source or configuration was
+changed to alter type checking.
+
+```text
+python -m pytest server/tests/unit/test_bootstrap_cli.py server/tests/unit/test_bootstrap_repository.py server/tests/unit/test_bootstrap_service.py -q --tb=short
+python -B -m pytest server/tests/unit/test_bootstrap_repository.py server/tests/unit/test_bootstrap_service.py -q --tb=short
+python -m ruff check server/tests/unit/test_bootstrap_cli.py server/tests/unit/test_bootstrap_repository.py server/tests/unit/test_bootstrap_service.py
+python -m mypy --config-file server/pyproject.toml server/tests/unit/test_bootstrap_cli.py server/tests/unit/test_bootstrap_repository.py server/tests/unit/test_bootstrap_service.py
+# Repeat the same mypy command with MYPYPATH set to the local server/src path.
+python -B deploy/verify_repository.py --scope current
+```
+
+Only V06 was updated during this session. Thirteen tracked bytecode files
+regenerated by initial verification were restored to their clean starting
+state; subsequent local Python checks used `-B`. A new, empty, untracked
+`deploy/version.env` appeared during the session and was left untouched.
+The three existing R5A test changes and untracked toolchain files were
+preserved. V07 and the final baseline were not updated, and R5B was not started.
+
+## R5A verification-only retry - 2026-09-11
+
+Scope: criterion 10 re-verification only, preserving the existing R5A changes.
+No implementation or test file was edited during this retry.
+
+**Current database-content audit: PASS. Requested R5A verification set:
+incomplete, with tool execution BLOCKED BY ENVIRONMENT.** Criterion 10 is not
+closed as an unqualified verified PASS because the three affected test modules,
+Ruff, and mypy have still not executed. This section supersedes the earlier
+missing-interpreter result only where fresh evidence is recorded below.
+
+Python is now available: host access locates CPython **3.12.10** at
+`C:/Users/mahar/AppData/Local/Programs/Python/Python312/python.exe`.
+The sandbox still could not discover that installation. Approved host access
+resolved interpreter discovery, but no prepared project environment was found
+in the workspace. The `uv run --no-sync` test attempt created the ignored
+`server/.venv` and then failed because pytest is absent. Read-only inspection
+also found no pytest, Ruff, mypy, SQLAlchemy, or installed server package in the
+host interpreter. No packages were installed or updated. The prepared
+environment's location was requested; no alternate path had been supplied at
+the time of this evidence update.
+
+| Check | Classification | Fresh evidence |
+| --- | --- | --- |
+| Current repository audit | **PASS** | Host Python ran `deploy/verify_repository.py --scope current`: exit 0, zero findings. The existing exact `mysql+pymysql` allowlist was unchanged. |
+| SQLite source scan | **PASS** | The same scoped `rg` command recorded below reports only `deploy/tests/test_verify_repository.py`. Inspection confirms these are rejection-fixture strings written to temporary files, not executed database engines. The three affected tests contain no SQLite implementation. |
+| Frozen runtime dependency trees | **PASS** | Offline `uv tree --project server --frozen --no-dev` and the equivalent agent command both exited 0. PyMySQL 1.2.0 is the server database driver; no competing database driver appears. The agent has no runtime dependencies. |
+| Three affected bootstrap modules | **BLOCKED BY ENVIRONMENT** | The exact combined command below exited 1 with `No module named pytest`, before pytest collection. Zero tests executed; no passing, failing, or skipped test count is claimed. |
+| Focused Ruff | **BLOCKED BY ENVIRONMENT** | `server/.venv/Scripts/python.exe -m ruff check` with the three affected file paths exited 1: `No module named ruff`. |
+| Focused strict mypy | **BLOCKED BY ENVIRONMENT** | `server/.venv/Scripts/python.exe -m mypy --config-file server/pyproject.toml` with the same paths exited 1: `No module named mypy`. |
+| Missing CLI module / console entry point | **FAIL (pre-existing implementation contract; separately recorded)** | History inspection confirms commit `c68b1cb` already had the CLI test importing `device_watch_server.enrollment.cli`, while that module and the `device-watch-bootstrap` project script were absent. HEAD and the current tree retain those absences. They were not caused by R5A and were not repaired, stubbed, or skipped. |
+
+The missing CLI module affects collection of
+`server/tests/unit/test_bootstrap_cli.py` (10 parameter-expanded cases). Once
+pytest and the project dependencies are available, this missing import is
+expected to stop normal combined collection; the repository and service test
+modules can then be run separately for independent evidence. The missing
+console entry point independently affects
+`test_installed_console_failure_redacts_environment_and_arguments`. These
+implementation defects do not prevent the standard-library repository audit.
+No CLI collection error or mypy diagnostic was actually reached in this retry:
+the missing verification packages stopped those commands first.
+
+Commands used host access where interpreter execution was required:
+
+```text
+.tmp/uv-tool/Scripts/uv.exe --no-python-downloads --offline --no-cache run --project server --frozen --group test --no-sync python -m pytest server/tests/unit/test_bootstrap_cli.py server/tests/unit/test_bootstrap_repository.py server/tests/unit/test_bootstrap_service.py -q --tb=short
+server/.venv/Scripts/python.exe -m ruff check server/tests/unit/test_bootstrap_cli.py server/tests/unit/test_bootstrap_repository.py server/tests/unit/test_bootstrap_service.py
+server/.venv/Scripts/python.exe -m mypy --config-file server/pyproject.toml server/tests/unit/test_bootstrap_cli.py server/tests/unit/test_bootstrap_repository.py server/tests/unit/test_bootstrap_service.py
+C:/Users/mahar/AppData/Local/Programs/Python/Python312/python.exe deploy/verify_repository.py --scope current
+.tmp/uv-tool/Scripts/uv.exe --no-python-downloads --offline --no-cache tree --project server --frozen --no-dev
+.tmp/uv-tool/Scripts/uv.exe --no-python-downloads --offline --no-cache tree --project agent --frozen --no-dev
+```
+
+Only this V06 evidence was updated in the verification-only retry. V07, the
+consolidated baseline, the existing repair, and the untracked toolchain files
+were preserved. No R5B work or unrelated implementation repair was performed.
+
+## R5A MySQL-only boundary repair attempt - 2026-09-11
+
+Base revision: `3554078`, including the interrupted R5A commit `128c0ca`.
+
+Scope: acceptance criterion 10 only. R5A is **not yet verified complete**.
+The source changes below remove the remaining SQLite test engines, but the
+required executable checks are **BLOCKED BY ENVIRONMENT**. No criterion 10
+PASS is claimed. The separate missing CLI implementation described below is
+a repository defect, not an environment block.
+
+### Resume inspection and changes
+
+- Initial `git status`, `git diff --stat`, and `git diff` showed no tracked
+  modifications. Untracked `.nvmrc`, `.python-version`, and `TOOLCHAIN.md`
+  were present and preserved.
+- The repository test had already been converted to a recording connection
+  and MySQL statement/DDL compilation. That conversion was retained. Stray
+  `git ls-files tags` text in `_database_row` and an incorrectly queued insert/
+  lookup result were corrected.
+- The CLI test's file-backed SQLite engine was replaced with a transaction
+  double. The create test retains the real provisioning service and captures
+  its repository insert; revoke tests check service dispatch. Assertions cover
+  service execution inside the transaction, commit before output, disposal,
+  rollback on failure, and generic errors.
+- The service test's SQLite fixture was replaced with a repository double.
+  Real provisioning, digest verification, lifecycle validation, UTC handling,
+  and generic errors remain under test. Calls record locking requests and
+  update order; the connection fixture rejects service-owned begin, commit,
+  rollback, or direct SQL execution. SQL guards and MySQL row-lock statements
+  remain covered by the existing repository tests. These are unit boundaries,
+  not evidence of live database persistence, rollback, uniqueness, or locking.
+- No production source, dependency, configuration, migration, or repository
+  verifier rule changed. The exact `mysql+pymysql` positive allowlist and its
+  negative fixtures were preserved. No Stage 2 functionality was implemented.
+
+### Targeted evidence
+
+| Check | Classification | Evidence |
+| --- | --- | --- |
+| Remaining SQLite source in server/agent/deploy | **PASS (static removal only)** | `rg -l -i 'sqlite\|pysqlite\|aiosqlite' server agent deploy -g '!**/__pycache__/**' -g '!**/.venv/**'` reports only `deploy/tests/test_verify_repository.py`, whose strings are negative audit fixtures, not executed engines. None of the three affected test modules retains SQLite code. |
+| Runtime dependency boundary | **PASS (static, unchanged)** | Inspection of server/agent `pyproject.toml` and `uv.lock` retains PyMySQL as the database driver; no competing SQLite/PostgreSQL/MariaDB/DuckDB driver was found. |
+| Affected pytest modules | **BLOCKED BY ENVIRONMENT** | Runner exited 1 before pytest started: no Python `==3.12.*` interpreter found. No tests passed, failed, or skipped in this attempt. |
+| Focused Ruff | **BLOCKED BY ENVIRONMENT** | Same missing interpreter; Ruff did not start. |
+| Focused strict mypy | **BLOCKED BY ENVIRONMENT** | Same missing interpreter; mypy did not start. |
+| Current repository audit | **BLOCKED BY ENVIRONMENT** | Same missing interpreter; `deploy/verify_repository.py --scope current` did not start. The static removal check does not substitute for this audit. |
+| Existing CLI test target | **FAIL (pre-existing, outside R5A)** | `server/tests/unit/test_bootstrap_cli.py` imports `device_watch_server.enrollment.cli`, but no such source module exists in the checkout. Its console test targets `device-watch-bootstrap`, while `[project.scripts]` in `server/pyproject.toml` declares only `device-watch-db-check`. An interpreter alone will not resolve these missing implementation contracts. No implementation was added and no test was skipped or hidden. |
+
+The copied `.tmp` Python environments reference an absent interpreter from
+another machine. The initial `uv python find 3.12` hit a sandbox cache denial;
+the same offline command with approved host access then confirmed that no
+Python 3.12 interpreter exists in virtual environments, managed installations,
+the search path, or the registry. No interpreter or dependency was downloaded
+or installed, and no Docker/MySQL or unrelated test was attempted.
+
+All four requested executable checks were attempted using this runner prefix:
+
+```text
+.tmp/uv-tool/Scripts/uv.exe --no-python-downloads --offline --no-cache run --project server --frozen --group test
+```
+
+Arguments appended in separate invocations:
+
+```text
+pytest server/tests/unit/test_bootstrap_cli.py server/tests/unit/test_bootstrap_repository.py server/tests/unit/test_bootstrap_service.py -q
+ruff check server/tests/unit/test_bootstrap_cli.py server/tests/unit/test_bootstrap_repository.py server/tests/unit/test_bootstrap_service.py
+mypy --config-file server/pyproject.toml server/tests/unit/test_bootstrap_cli.py server/tests/unit/test_bootstrap_repository.py server/tests/unit/test_bootstrap_service.py
+python deploy/verify_repository.py --scope current
+```
+
+Independent static review checked the three changed tests and identified the
+transaction-double gap described above, which was corrected. Executable
+verification remains outstanding. V07, the final Stage 1 baseline, historical
+findings below, and R5B were not updated or started.
+
+Final repository checks: `git diff --check` passed with no output. Status and
+diff review showed only the three requested tests and this V06 evidence file
+modified; the three pre-existing untracked toolchain files remained unchanged.
+
 ## R4C targeted documentation re-verification - 2026-09-11
 
 Base revision: `60db4a8` plus the R4C worktree changes.

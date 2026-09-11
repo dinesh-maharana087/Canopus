@@ -5,27 +5,27 @@ import os
 import re
 import subprocess
 import sys
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any
+from typing import cast
+from unittest.mock import Mock
 from uuid import UUID
 
 import pytest
 from pydantic import SecretStr
-from sqlalchemy import create_engine, event
-from sqlalchemy.engine import Engine
+from sqlalchemy.engine import Connection
 
 from device_watch_server.core.config import SettingsError
 from device_watch_server.enrollment import cli as bootstrap_cli
+from device_watch_server.enrollment import service
 from device_watch_server.enrollment.bootstrap import BootstrapValue
-from device_watch_server.enrollment.repository import (
-    bootstrap_table,
-    lookup_bootstrap_by_id,
-)
+from device_watch_server.enrollment.repository import BootstrapRecord
 from device_watch_server.enrollment.service import (
+    BootstrapServiceError,
     ProvisionedBootstrap,
-    provision_bootstrap,
 )
 
 HMAC_PEPPER = "bootstrap-cli-pepper-material-32-bytes-minimum"
@@ -41,12 +41,30 @@ def _settings(configured_pepper: str | None = HMAC_PEPPER) -> SimpleNamespace:
     return SimpleNamespace(device_watch_bootstrap_hmac_pepper=pepper_value)
 
 
-def _database_engine(tmp_path: Path) -> tuple[Engine, str]:
-    database_path = tmp_path / "bootstrap-cli.sqlite"
-    sqlite_url = f"sqlite+pysqlite:///{database_path.as_posix()}"
-    engine = create_engine(sqlite_url)
-    bootstrap_table.create(engine)
-    return engine, sqlite_url
+class _TransactionEngine:
+    """Record the CLI's transaction boundary without opening a database."""
+
+    def __init__(self) -> None:
+        self.connection = cast(Connection, Mock(spec_set=Connection))
+        self.events: list[str] = []
+        self.transaction_active = False
+        self.disposed = False
+
+    @contextmanager
+    def begin(self) -> Iterator[Connection]:
+        self.transaction_active = True
+        try:
+            yield self.connection
+        except Exception:
+            self.events.append("rollback")
+            raise
+        else:
+            self.events.append("commit")
+        finally:
+            self.transaction_active = False
+
+    def dispose(self) -> None:
+        self.disposed = True
 
 
 def _assert_generic_failure(
@@ -63,22 +81,28 @@ def _assert_generic_failure(
 def test_create_prints_plaintext_once_only_after_commit(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
-    tmp_path: Path,
 ) -> None:
-    engine, sqlite_url = _database_engine(tmp_path)
+    engine = _TransactionEngine()
+    inserted: list[BootstrapRecord] = []
+
+    def capture_insert(connection: Connection, record: BootstrapRecord) -> None:
+        assert connection is engine.connection
+        assert engine.transaction_active
+        inserted.append(record)
+
+    monkeypatch.setattr(service, "insert_bootstrap", capture_insert)
     monkeypatch.setattr(bootstrap_cli, "load_settings", _settings)
     monkeypatch.setattr(
         bootstrap_cli,
         "create_database_engine",
         lambda settings: engine,
     )
-    events: list[str] = []
-    event.listen(engine, "commit", lambda connection: events.append("commit"))
+    events = engine.events
     real_print = builtins.print
 
     def recording_print(*args: object, **kwargs: object) -> None:
         events.append("print")
-        real_print(*args, **kwargs)
+        real_print(*args, **kwargs)  # type: ignore[arg-type]
 
     monkeypatch.setattr(builtins, "print", recording_print)
 
@@ -100,17 +124,10 @@ def test_create_prints_plaintext_once_only_after_commit(
     assert "URLs" in captured.out
     assert "shell history" in captured.out
     assert HMAC_PEPPER not in captured.out
-    assert sqlite_url not in captured.out
-
-    inspection_engine = create_engine(sqlite_url)
-    try:
-        with inspection_engine.connect() as connection:
-            rows = connection.execute(bootstrap_table.select()).mappings().all()
-    finally:
-        inspection_engine.dispose()
-    assert len(rows) == 1
-    assert rows[0]["operator_label"] == "night shift"
-    assert rows[0]["expires_at"] - rows[0]["created_at"] == timedelta(minutes=7)
+    assert engine.disposed
+    assert len(inserted) == 1
+    assert inserted[0].operator_label == "night shift"
+    assert inserted[0].expires_at - inserted[0].created_at == timedelta(minutes=7)
 
 
 class _FailingCommit:
@@ -213,18 +230,19 @@ def test_configuration_and_database_failures_are_generic(
     _assert_generic_failure(capsys, sensitive_detail)
 
 
-def test_revoke_commits_a_terminal_transition_without_deleting_the_record(
+def test_revoke_dispatches_the_id_and_commits_before_reporting_success(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
-    tmp_path: Path,
 ) -> None:
-    engine, sqlite_url = _database_engine(tmp_path)
-    with engine.begin() as connection:
-        created = provision_bootstrap(
-            connection,
-            HMAC_PEPPER,
-            clock=lambda: NOW,
-        )
+    engine = _TransactionEngine()
+
+    def revoke_in_transaction(connection: Connection, bootstrap_id: UUID) -> UUID:
+        assert connection is engine.connection
+        assert engine.transaction_active
+        return bootstrap_id
+
+    revoke = Mock(side_effect=revoke_in_transaction)
+    monkeypatch.setattr(bootstrap_cli, "revoke_bootstrap", revoke)
     monkeypatch.setattr(bootstrap_cli, "load_settings", lambda: _settings(None))
     monkeypatch.setattr(
         bootstrap_cli,
@@ -232,33 +250,35 @@ def test_revoke_commits_a_terminal_transition_without_deleting_the_record(
         lambda settings: engine,
     )
 
-    exit_code = bootstrap_cli.main(["revoke", str(created.bootstrap_id)])
+    real_print = builtins.print
+
+    def recording_print(*args: object, **kwargs: object) -> None:
+        engine.events.append("print")
+        real_print(*args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(builtins, "print", recording_print)
+
+    exit_code = bootstrap_cli.main(["revoke", str(FIXED_BOOTSTRAP_ID)])
 
     captured = capsys.readouterr()
     assert exit_code == 0
     assert captured.err == ""
     assert captured.out == (
-        f"Bootstrap revoked\nBootstrap ID: {created.bootstrap_id}\n"
+        f"Bootstrap revoked\nBootstrap ID: {FIXED_BOOTSTRAP_ID}\n"
     )
-    assert created.bootstrap_value.to_wire() not in captured.out
-
-    inspection_engine = create_engine(sqlite_url)
-    try:
-        with inspection_engine.connect() as connection:
-            stored = lookup_bootstrap_by_id(connection, created.bootstrap_id)
-    finally:
-        inspection_engine.dispose()
-    assert stored is not None
-    assert stored.consumed_at is None
-    assert stored.revoked_at is not None
+    revoke.assert_called_once_with(engine.connection, FIXED_BOOTSTRAP_ID)
+    assert engine.events[0] == "commit"
+    assert engine.events.index("commit") < engine.events.index("print")
+    assert engine.disposed
 
 
 def test_unknown_revoke_failure_is_generic(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
-    tmp_path: Path,
 ) -> None:
-    engine, _ = _database_engine(tmp_path)
+    engine = _TransactionEngine()
+    revoke = Mock(side_effect=BootstrapServiceError())
+    monkeypatch.setattr(bootstrap_cli, "revoke_bootstrap", revoke)
     monkeypatch.setattr(bootstrap_cli, "load_settings", lambda: _settings(None))
     monkeypatch.setattr(
         bootstrap_cli,
@@ -269,6 +289,9 @@ def test_unknown_revoke_failure_is_generic(
     assert bootstrap_cli.main(["revoke", str(FIXED_BOOTSTRAP_ID)]) == 1
 
     _assert_generic_failure(capsys, str(FIXED_BOOTSTRAP_ID))
+    revoke.assert_called_once_with(engine.connection, FIXED_BOOTSTRAP_ID)
+    assert engine.events == ["rollback"]
+    assert engine.disposed
 
 
 def test_installed_console_failure_redacts_environment_and_arguments() -> None:

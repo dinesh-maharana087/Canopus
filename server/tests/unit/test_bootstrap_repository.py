@@ -96,7 +96,7 @@ def _database_row(record: BootstrapRecord) -> dict[str, object]:
         "lookup_fingerprint": record.lookup_fingerprint,
         "digest_version": record.digest_version,
         "digest": record.digest,
-        "operator_label": record.operator_label,git ls-files tags
+        "operator_label": record.operator_label,
         "created_at": without_timezone(record.created_at),
         "expires_at": without_timezone(record.expires_at),
         "consumed_at": without_timezone(record.consumed_at),
@@ -389,7 +389,10 @@ def test_guarded_revoke_updates_an_available_bootstrap_once() -> None:
 
 def test_repository_leaves_transactions_owned_by_the_caller() -> None:
     """Catch a repository operation that commits or rolls back its caller's work."""
-    connection = _RecordingConnection(_ExecutionResult(row=_database_row(make_record())))
+    connection = _RecordingConnection(
+        _ExecutionResult(),
+        _ExecutionResult(row=_database_row(make_record())),
+    )
 
     insert_bootstrap(connection.sqlalchemy, make_record())
     assert lookup_bootstrap_by_id(connection.sqlalchemy, BOOTSTRAP_ID) == make_record()
