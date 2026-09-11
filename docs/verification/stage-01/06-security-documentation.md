@@ -7,6 +7,52 @@ Overall result: **FAIL**
 
 The current repository tree was verified as-is. Source code was not modified. The locked Python environment could not be invoked inside the sandbox, and the required external-access request was rejected because the workspace approval service was out of credits. Consequently, the fresh repository-verifier and audit-test executions are classified as **BLOCKED BY ENVIRONMENT**; they were not retried through another execution path.
 
+## R4B targeted repair re-verification - 2026-09-11
+
+Base revision: `0ee27bb988733e0c05dd814244f171d8360f8d1a` plus the R4B worktree changes.
+
+Repair scope: V06-01, V06-02, V06-03 audit detection, and the historical/current audit boundary.
+
+R4B repair result: **PASS**.
+
+Overall V06 result: **FAIL** remains unchanged because V06-04 and V06-05 are outside R4B, and the current repository still contains the detected SQLite test engines and Stage 2 implementation.
+
+This addendum supersedes only the original blocked execution results and the audit-implementation findings for V06-01 through V06-03. It does not rewrite the historical verification below or treat the current Stage 2-containing tree as a Stage 1 tree.
+
+| R4B contract | Result | Current evidence |
+| --- | --- | --- |
+| Credential/private-key detection | PASS | The verifier now recognizes quoted values and quoted JSON-style keys in non-example configuration, scans configuration formats outside production source directories, recognizes generic/encrypted/DSA and other private-key headers, and rejects common private-key filenames or key-container suffixes without printing their contents. Focused regressions cover TOML, JSON, PEM, `.key`, and `.p12` cases. The current repository produces no credential/private-key finding. |
+| Positive MySQL allowlist | PASS | Database URL contexts and SQLAlchemy sync/async engine construction now accept only the exact `mysql+pymysql` scheme. Python tests are inspected for engine construction rather than skipped wholesale, while negative validation fixtures and unrelated HTTP callback URLs do not create false findings. Unknown schemes, an HTTPS value assigned to `DATABASE_URL`, and SQLite engine construction are covered by regression tests. |
+| Stage 1 absence-rule coverage | PASS | Historical Stage 1 scope rejects migrations other than the Stage 1 baseline, detects `op.create_table`, and rejects server implementation modules outside the Stage 1 source allowlist. The current tree's two later migrations and six domain/enrollment modules are now reported. |
+| Historical/current boundary | PASS | `--scope current` applies repository-wide credential, key, database, and production-topology rules without treating approved Stage 2 work as a Stage 1 absence violation. `--scope stage-one` adds the historical absence rules. The archived `1ee0b2b` Stage 1 snapshot passes `--scope stage-one`; applying that scope to the current tree intentionally fails. |
+| Current repository MySQL-only content | FAIL | `--scope current` reports the three existing SQLite engine test modules named in V06-02. R4B repairs detection; it does not rewrite Stage 2 database tests. |
+| Current repository Stage 1 absence | NOT APPLICABLE | The current repository contains later approved Stage 2 work. Historical Stage 1 absence is evaluated against the Stage 1 snapshot, while `--scope stage-one` remains available to show why the current tree cannot be represented as Stage 1. |
+
+Targeted commands and results:
+
+```text
+pytest deploy/tests/test_verify_repository.py -q
+# 9 passed
+
+ruff check deploy/verify_repository.py deploy/tests/test_verify_repository.py
+# All checks passed
+
+mypy deploy/verify_repository.py
+# Success: no issues found in 1 source file
+
+python deploy/verify_repository.py --scope current
+# exit 1: exactly the three existing SQLite engine test modules
+
+python deploy/verify_repository.py --scope stage-one
+# exit 1: the same database findings plus two later migrations/table operations
+# and six domain/enrollment source modules
+
+python deploy/verify_repository.py <archived-1ee0b2b-tree> --scope stage-one
+# exit 0, no findings
+```
+
+The nonzero current-tree audit results are expected findings and demonstrate that the repaired rules no longer permit the known violations to evade the audit. They are not represented as verifier execution failures. Acceptance criteria 10 and 11 therefore retain their existing current-tree classifications, so V07 and the consolidated baseline are not changed by R4B.
+
 ## Components reviewed
 
 - Stage 1 design, master-index, status, execution-card, and implementation-plan sections limited to Steps 15-16
