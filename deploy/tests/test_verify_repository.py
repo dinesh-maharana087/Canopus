@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import subprocess
 import sys
 from pathlib import Path
+
+import pytest
 
 sys.path.insert(0, str(Path(__file__).parents[1]))
 
@@ -240,3 +243,206 @@ networks:
 """,
     )
     assert rules(tmp_path) >= {"production-services", "server-port"}
+
+
+def git(root: Path, *args: str) -> str:
+    return subprocess.run(
+        ["git", "-C", str(root), *args],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+
+
+def commit_fixture(root: Path) -> str:
+    git(root, "add", ".")
+    git(
+        root, "-c", "user.name=Audit fixture", "-c", "user.email=audit@example.test",
+        "-c", "commit.gpgsign=false", "commit", "-qm", "Audit fixture",
+    )
+    return git(root, "rev-parse", "HEAD")
+
+
+@pytest.fixture
+def stage_one_history(tmp_path: Path) -> tuple[Path, str]:
+    git(tmp_path, "init", "-q")
+    write(
+        tmp_path, "server/src/device_watch_server/app.py",
+        'app.add_api_route("/api/v1/health/live", live)\n',
+    )
+    write(
+        tmp_path, "server/alembic/versions/20260831_0001_baseline.py",
+        "def upgrade(): pass\n",
+    )
+    return tmp_path, commit_fixture(tmp_path)
+
+
+def test_historical_stage_one_commit_passes_with_explicit_provenance(
+    stage_one_history: tuple[Path, str], capsys: pytest.CaptureFixture[str],
+) -> None:
+    root, revision = stage_one_history
+
+    assert main([str(root), "--stage-one-ref", revision]) == 0
+    assert capsys.readouterr().out == f"Stage 1 snapshot: {revision}\n"
+
+
+def test_later_additions_and_dirty_stage_one_files_do_not_rewrite_history(
+    stage_one_history: tuple[Path, str], capsys: pytest.CaptureFixture[str],
+) -> None:
+    root, revision = stage_one_history
+    write(
+        root, "server/src/device_watch_server/enrollment/service.py",
+        "def provision_bootstrap(): pass\n",
+    )
+    write(
+        root, "server/alembic/versions/20260908_0002_devices.py",
+        "def upgrade():\n    op.create_table('devices')\n",
+    )
+    commit_fixture(root)
+    # A changed foundation needs its own re-verification, not a rewritten past.
+    write(
+        root, "server/src/device_watch_server/app.py",
+        'app.add_api_route("/api/v1/enroll", enroll)\n',
+    )
+    before = git(root, "status", "--porcelain")
+
+    assert main([str(root), "--stage-one-ref", revision]) == 0
+    assert capsys.readouterr().out == f"Stage 1 snapshot: {revision}\n"
+    assert audit_repository(root, scope=AuditScope.CURRENT) == []
+    assert rules(root) >= {"stage-one-source", "stage-one-migration", "business-route"}
+    assert git(root, "status", "--porcelain") == before
+
+
+@pytest.mark.parametrize(
+    "source",
+    (
+        "import device_watch_server.enrollment.service as bootstrap\n",
+        "from device_watch_server.enrollment import service\n",
+        "from device_watch_server import enrollment\n",
+        "from . import enrollment\n",
+        "from .domain.contracts import BootstrapState\n",
+    ),
+)
+def test_stage_one_source_cannot_depend_on_later_modules(
+    tmp_path: Path, source: str,
+) -> None:
+    write(tmp_path, "server/src/device_watch_server/app.py", source)
+
+    assert "stage-one-import" in rules(tmp_path)
+    assert audit_repository(tmp_path, scope=AuditScope.CURRENT) == []
+
+
+def test_stage_one_module_and_exported_symbol_imports_remain_valid(
+    tmp_path: Path,
+) -> None:
+    write(
+        tmp_path, "server/src/device_watch_server/api/__init__.py",
+        "from .router import api_router\n",
+    )
+    write(
+        tmp_path, "server/src/device_watch_server/app.py",
+        "from .api import router, api_router\n"
+        "from device_watch_server.core.config import Settings\n",
+    )
+
+    assert audit_repository(tmp_path) == []
+
+
+@pytest.mark.parametrize(
+    "source",
+    (
+        'app.add_api_route("/api/v1/enroll", enroll)\n',
+        'from fastapi import APIRouter as Router\n'
+        'enrollment = Router()\n'
+        '@enrollment.post("/api/v1/enroll")\ndef enroll(): pass\n',
+        'from fastapi import APIRouter\n'
+        'router = APIRouter(prefix="/api/v1/enroll")\n',
+        'app.include_router(health_router, prefix="/api/v1/enroll")\n',
+        'from device_watch_server.api.health import router as health_routes\n'
+        '@health_routes.post("/api/v1/enroll")\ndef enroll(): pass\n',
+        'routes = router\n@routes.post("/api/v1/enroll")\ndef enroll(): pass\n',
+        'routes = router\nroutes.include_router(health_router, prefix="/api/v1/enroll")\n',
+        'from fastapi import APIRouter\nrouter = APIRouter(prefix=f"{stage2_prefix}")\n',
+        '@router.get(f"/api/v1/health/live{suffix}")\ndef enroll(): pass\n',
+    ),
+)
+def test_stage_one_source_cannot_expose_later_workflow(
+    tmp_path: Path, source: str,
+) -> None:
+    write(tmp_path, "server/src/device_watch_server/app.py", source)
+
+    assert "business-route" in rules(tmp_path)
+    assert audit_repository(tmp_path, scope=AuditScope.CURRENT) == []
+
+
+def test_leakage_in_historical_commit_is_not_hidden_by_clean_current_files(
+    stage_one_history: tuple[Path, str], capsys: pytest.CaptureFixture[str],
+) -> None:
+    root, _ = stage_one_history
+    write(
+        root, "server/src/device_watch_server/app.py",
+        "from .enrollment import service\n",
+    )
+    leaked_revision = commit_fixture(root)
+    write(root, "server/src/device_watch_server/app.py", "# clean working file\n")
+
+    assert main([str(root), "--stage-one-ref", leaked_revision]) == 1
+    output = capsys.readouterr().out
+    assert f"Stage 1 snapshot: {leaked_revision}" in output
+    assert "stage-one-import" in output
+
+
+def test_archive_export_attributes_cannot_hide_historical_leakage(
+    stage_one_history: tuple[Path, str], capsys: pytest.CaptureFixture[str],
+) -> None:
+    root, _ = stage_one_history
+    write(root, ".gitattributes", "server/src/device_watch_server/app.py export-ignore\n")
+    write(
+        root, "server/src/device_watch_server/app.py",
+        "from .enrollment import service\n",
+    )
+    revision = commit_fixture(root)
+
+    assert main([str(root), "--stage-one-ref", revision]) == 1
+    assert "stage-one-import" in capsys.readouterr().out
+
+
+def test_git_replacements_cannot_hide_historical_leakage(
+    stage_one_history: tuple[Path, str], capsys: pytest.CaptureFixture[str],
+) -> None:
+    root, clean_revision = stage_one_history
+    write(
+        root, "server/src/device_watch_server/app.py",
+        "from .enrollment import service\n",
+    )
+    leaked_revision = commit_fixture(root)
+    git(root, "replace", leaked_revision, clean_revision)
+
+    assert main([str(root), "--stage-one-ref", leaked_revision]) == 1
+    assert "stage-one-import" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("revision", ("absent-private-value", "HEAD:server/src/device_watch_server/app.py"))
+def test_invalid_or_non_commit_snapshot_fails_without_current_tree_fallback(
+    stage_one_history: tuple[Path, str], revision: str,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    root, _ = stage_one_history
+
+    assert main([str(root), "--stage-one-ref", revision]) == 2
+    output = capsys.readouterr().out
+    assert output == "historical-snapshot: unable to audit the requested Stage 1 commit\n"
+    assert revision not in output
+
+
+def test_snapshot_requires_a_repository(tmp_path: Path) -> None:
+    assert main([str(tmp_path), "--stage-one-ref", "HEAD"]) == 2
+
+
+def test_current_scope_cannot_be_replaced_by_a_historical_snapshot(
+    stage_one_history: tuple[Path, str],
+) -> None:
+    root, revision = stage_one_history
+    with pytest.raises(SystemExit) as error:
+        main([str(root), "--scope", "current", "--stage-one-ref", revision])
+    assert error.value.code == 2

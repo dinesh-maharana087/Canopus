@@ -4,11 +4,16 @@ from __future__ import annotations
 
 import argparse
 import ast
+import io
 import re
+import subprocess
+import tarfile
 from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import Enum
+from importlib.util import resolve_name
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 
 @dataclass(frozen=True, slots=True)
@@ -94,6 +99,16 @@ _STAGE_ONE_SERVER_SOURCES = {
     "server/src/device_watch_server/db/health.py",
     "server/src/device_watch_server/main.py",
 }
+_STAGE_ONE_MODULES = {
+    path.removeprefix("server/src/").removesuffix(".py").replace("/", ".")
+    .removesuffix(".__init__")
+    for path in _STAGE_ONE_SERVER_SOURCES
+}
+_STAGE_ONE_PACKAGES = {
+    path.removeprefix("server/src/").removesuffix("/__init__.py").replace("/", ".")
+    for path in _STAGE_ONE_SERVER_SOURCES if path.endswith("/__init__.py")
+}
+_HEALTH_ROUTES = {"/api/v1/health/live", "/api/v1/health/ready"}
 _ALEMBIC_TABLE = re.compile(r"\bop\.create_table\s*\(")
 _LIVE_SECRET = re.compile(
     r"""(?<![A-Za-z0-9_-])["']?
@@ -247,6 +262,107 @@ def _finding(root: Path, path: Path, rule: str, message: str) -> Finding:
     return Finding(_relative(root, path), rule, message)
 
 
+def _package_exports(contents: Iterable[tuple[Path, str]], root: Path) -> dict[str, set[str]]:
+    """Allow symbols re-exported by the approved Stage 1 packages."""
+    exports: dict[str, set[str]] = {}
+    for path, text in contents:
+        relative = _relative(root, path)
+        if relative not in _STAGE_ONE_SERVER_SOURCES or path.name != "__init__.py":
+            continue
+        module = relative.removeprefix("server/src/").removesuffix("/__init__.py").replace("/", ".")
+        names: set[str] = set()
+        exports[module] = names
+        try:
+            tree = ast.parse(text)
+        except SyntaxError:
+            continue  # The Stage 1 source check reports unreadable Python below.
+        for node in tree.body:
+            if isinstance(node, (ast.Import, ast.ImportFrom)):
+                names.update(alias.asname or alias.name.split(".")[0] for alias in node.names)
+            elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                names.add(node.name)
+            elif isinstance(node, ast.Assign):
+                names.update(target.id for target in node.targets if isinstance(target, ast.Name))
+            elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+                names.add(node.target.id)
+    return exports
+
+
+def _stage_one_import_violation(
+    tree: ast.Module, relative: str, exports: dict[str, set[str]],
+) -> bool:
+    module = relative.removeprefix("server/src/").removesuffix(".py").replace("/", ".")
+    package = module.rpartition(".")[0]
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            if any(
+                alias.name.startswith("device_watch_server.")
+                and alias.name not in _STAGE_ONE_MODULES
+                for alias in node.names
+            ):
+                return True
+        elif isinstance(node, ast.ImportFrom):
+            imported = node.module or ""
+            if node.level:
+                try:
+                    imported = resolve_name("." * node.level + imported, package)
+                except ImportError:
+                    return True
+            if imported != "device_watch_server" and not imported.startswith("device_watch_server."):
+                continue
+            if imported not in _STAGE_ONE_MODULES:
+                return True
+            if imported in _STAGE_ONE_PACKAGES and any(
+                alias.name not in exports.get(imported, set())
+                and f"{imported}.{alias.name}" not in _STAGE_ONE_MODULES
+                for alias in node.names
+            ):
+                return True
+    return False
+
+
+def _stage_one_route_violation(tree: ast.Module) -> bool:
+    """Keep aliased routers and route prefixes inside the health-only boundary."""
+    factories = {"APIRouter", "FastAPI"}
+    routers = {"app", "router"}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.module == "fastapi":
+            factories.update(
+                alias.asname or alias.name for alias in node.names
+                if alias.name in {"APIRouter", "FastAPI"}
+            )
+
+    def is_factory(call: ast.Call) -> bool:
+        return (
+            isinstance(call.func, ast.Name) and call.func.id in factories
+            or isinstance(call.func, ast.Attribute) and call.func.attr in {"APIRouter", "FastAPI"}
+        )
+
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.Assign, ast.AnnAssign)) and isinstance(node.value, ast.Call) and is_factory(node.value):
+            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+            routers.update(target.id for target in targets if isinstance(target, ast.Name))
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        method = (
+            node.func.attr
+            if isinstance(node.func, ast.Attribute)
+            and isinstance(node.func.value, ast.Name)
+            and node.func.value.id in routers else ""
+        )
+        if is_factory(node) or method == "include_router":
+            if any(keyword.arg == "prefix" and _literal_text(keyword.value) != "" for keyword in node.keywords):
+                return True
+        if method in {"get", "post", "put", "patch", "delete", "head", "options", "trace", "websocket", "api_route", "add_api_route", "add_api_websocket_route"}:
+            path = node.args[0] if node.args else next(
+                (keyword.value for keyword in node.keywords if keyword.arg == "path"), None,
+            )
+            if path is None or _literal_text(path) not in _HEALTH_ROUTES:
+                return True
+    return False
+
+
 def audit_repository(
     root: Path,
     *,
@@ -258,6 +374,7 @@ def audit_repository(
     project_files = sorted(_project_files(root))
     private_key_files = {path for path in project_files if _is_private_key_file(path)}
     contents = list(_files(project_files))
+    exports = _package_exports(contents, root) if scope is AuditScope.STAGE_ONE else {}
 
     for path in sorted(private_key_files):
         findings.append(
@@ -282,10 +399,20 @@ def audit_repository(
 
         if scope is AuditScope.STAGE_ONE and relative.startswith("server/src/"):
             for match in _ROUTE.finditer(text):
-                if match.group(1) not in {"/api/v1/health/live", "/api/v1/health/ready"}:
+                if match.group(1) not in _HEALTH_ROUTES:
                     findings.append(_finding(root, path, "business-route", "non-health API route is present"))
             if re.search(r"class\s+\w+\s*\(\s*Base\s*\)|__tablename__\s*=", text):
                 findings.append(_finding(root, path, "domain-table", "mapped domain table is present"))
+            if path.suffix.lower() == ".py":
+                try:
+                    tree = ast.parse(text)
+                except SyntaxError:
+                    findings.append(_finding(root, path, "stage-one-source", "Stage 1 Python source cannot be parsed"))
+                else:
+                    if _stage_one_import_violation(tree, relative, exports):
+                        findings.append(_finding(root, path, "stage-one-import", "local import is outside the Stage 1 module boundary"))
+                    if _stage_one_route_violation(tree):
+                        findings.append(_finding(root, path, "business-route", "non-health API route or prefix is present"))
 
         if (
             scope is AuditScope.STAGE_ONE
@@ -348,6 +475,28 @@ def audit_repository(
     return findings
 
 
+def _git_bytes(root: Path, *args: str) -> bytes:
+    return subprocess.run(
+        ["git", "-C", str(root), *args],
+        check=True, capture_output=True, timeout=30,
+    ).stdout
+
+
+def audit_stage_one_ref(root: Path, revision: str) -> tuple[str, list[Finding]]:
+    """Audit an immutable Git tree with today's verifier, without checking it out."""
+    commit = _git_bytes(
+        root, "rev-parse", "--verify", "--end-of-options", f"{revision}^{{commit}}",
+    ).decode("ascii").strip()
+    if not re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", commit):
+        raise ValueError("invalid commit identity")
+    archive = _git_bytes(root, "archive", "--format=tar", commit)
+    with TemporaryDirectory(prefix="device-watch-stage-one-") as directory:
+        snapshot = Path(directory)
+        with tarfile.open(fileobj=io.BytesIO(archive), mode="r:") as source:
+            source.extractall(snapshot, filter="data")
+        return commit, audit_repository(snapshot, scope=AuditScope.STAGE_ONE)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Audit the Device Watch repository")
     parser.add_argument("root", nargs="?", type=Path, default=Path.cwd())
@@ -357,11 +506,23 @@ def main(argv: list[str] | None = None) -> int:
         default=AuditScope.STAGE_ONE.value,
         help="apply current security checks or historical Stage 1 absence boundaries",
     )
-    args = parser.parse_args(argv)
-    findings = audit_repository(
-        args.root.resolve(),
-        scope=AuditScope(args.scope),
+    parser.add_argument(
+        "--stage-one-ref",
+        help="audit and report a historical Stage 1 commit instead of the working tree",
     )
+    args = parser.parse_args(argv)
+    scope = AuditScope(args.scope)
+    if args.stage_one_ref is not None:
+        if scope is not AuditScope.STAGE_ONE:
+            parser.error("--stage-one-ref requires --scope stage-one")
+        try:
+            commit, findings = audit_stage_one_ref(args.root.resolve(), args.stage_one_ref)
+        except (OSError, subprocess.SubprocessError, tarfile.TarError, ValueError):
+            print("historical-snapshot: unable to audit the requested Stage 1 commit")
+            return 2
+        print(f"Stage 1 snapshot: {commit}")
+    else:
+        findings = audit_repository(args.root.resolve(), scope=scope)
     for finding in findings:
         print(f"{finding.path}: {finding.rule}: {finding.message}")
     return 1 if findings else 0
