@@ -1,5 +1,21 @@
 # Device Watch Stage 1 Status
 
+## Current independent verification — 2026-09-12
+
+**STAGE 1 VERIFIED WITH ENVIRONMENT BLOCKS** — **9 PASS, 0 FAIL, 7 BLOCKED**.
+Blocked criteria: **2, 3, 7, 8, 9, 13, 15**. No deterministic Stage 1
+acceptance failure remains after the verified R5A/R5B/R5C and safeguard repairs.
+
+The authoritative handoff is the [V08 final baseline](../verification/stage-01/stage-01-baseline.md),
+with the [current V07 mapping](../verification/stage-01/07-acceptance-review.md).
+Stage 2+ may reuse the qualified PASS contracts; real MySQL, Docker/Compose/
+Caddy and other recorded runtime checks still require targeted verification.
+This is not a claim of full runtime acceptance or current Stage 2 completeness.
+
+The implementation handoffs below are historical. Their `Complete` labels and
+older counts do not override independent verification. V08 consolidated existing
+evidence without rerunning suites or starting Stage 2 work.
+
 ## Planning Status
 
 Planning decomposition is complete. The master index is [docs/superpowers/plans/2026-08-31-device-watch-stage-1/00-master-index.md](../superpowers/plans/2026-08-31-device-watch-stage-1/00-master-index.md).
@@ -451,7 +467,7 @@ Blocked commands, not reported as successful:
 
 No secret or database URL value was echoed. The final evidence run included focused Step 15 audit refinements for generated worktrees, synthetic test fixtures, and documentation headings; no application runtime behavior was expanded. Stage 1 acceptance evidence is complete for the available environment, with container/database evidence reserved for a Docker/MySQL-capable host.
 
-## Stage 1 Status
+## Stage 1 Status (historical implementation handoff)
 
 Stage 1 is **Complete**. Steps 01 through 17 are complete, with the Docker/MySQL-dependent evidence explicitly blocked by host capability. No later numbered implementation step is defined by this plan.
 

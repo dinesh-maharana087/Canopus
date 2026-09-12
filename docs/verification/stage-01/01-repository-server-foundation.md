@@ -1,5 +1,48 @@
 # Stage 1 Verification V01 — Repository and Server Foundation
 
+## Criterion 9 remaining safeguard repair - 2026-09-12
+
+Base revision: `f150b8a34f46b33fe9a171febd8ccfea16f174ca` (verified R5C).
+Scope: the explicitly authorized verification-and-fix for the remaining
+deterministic Criterion 9 safeguard failure. **Repair result: PASS.**
+
+R5C repaired local-database/operator-env protection but deliberately left the
+other missing safeguard categories untouched. A focused check reproduced the
+remaining failure: **11/11 required synthetic paths were not ignored** (exit 1).
+The paths used a nonexistent `r5c-safeguard-probe/` parent, so generated cache
+directories' own ignore files and sandbox permissions could not mask missing
+repository rules. No probe directory or file was created.
+
+Only the following previously approved `b6cda56` patterns were restored to
+`.gitignore`: `*.pem`, `*.key`, `.venv/`, `__pycache__/`, `.pytest_cache/`,
+`.mypy_cache/`, `.ruff_cache/`, `node_modules/`, `dist/`, `coverage/`, `.coverage`.
+Existing R5C rules, example exceptions, and user tool/editor rules were retained.
+No existing tracked file was removed from the index.
+
+### Focused verification
+
+Each path was checked separately with
+`git -c core.excludesFile=NUL check-ignore --no-index -q -- <path>`;
+expected exit status was 0 for protected paths and 1 for trackable paths.
+
+| Check | Result |
+| --- | --- |
+| Restored safeguards | **PASS — 11/11.** Beneath the synthetic parent: `operator.pem`, `operator.key`, `.venv/pyvenv.cfg`, `__pycache__/module.pyc`, `.pytest_cache/probe`, `.mypy_cache/probe`, `.ruff_cache/probe`, `node_modules/probe`, `dist/probe`, `coverage/probe`, `.coverage`. |
+| Preserved R5C protection | **PASS — 22/22.** The same 16 database/sidecar paths and six operator-env paths listed in the R5C section below were rerun successfully. |
+| Trackable examples/configuration | **PASS — 10/10.** The eight R5C paths below plus `deploy/mysql-ca.pem.example` and `deploy/private.key.example` remain trackable. |
+| Existing files/index | **PASS.** All four committed environment examples remain tracked; those examples and `deploy/version.env` have no diff from HEAD. The synthetic probe directory does not exist. |
+
+The protected and trackable assertion commands both exited 0: **33/33 and
+10/10**, respectively. No Python/component suite, dependency installation,
+Docker, MySQL, Caddy, or other infrastructure check was required or run.
+
+The remaining deterministic safeguard failure is repaired. This supersedes
+R5C's limited-scope qualification for these restored patterns, preserving the
+earlier record below. V07 remaps Criterion 9 to **BLOCKED BY ENVIRONMENT**
+because required runtime test paths still lack evidence; these Git checks do
+not establish their success. Unrelated Stage 2 defects remain separate, and
+the final Stage 1 baseline is not regenerated here.
+
 ## R5C repository safeguard repair - 2026-09-12
 
 Base revision: `1b440ac755503155e3f74be6e24787fafa0856e6`
