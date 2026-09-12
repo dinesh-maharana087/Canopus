@@ -1,5 +1,70 @@
 # Stage 1 Verification V01 — Repository and Server Foundation
 
+## R5C repository safeguard repair - 2026-09-12
+
+Base revision: `1b440ac755503155e3f74be6e24787fafa0856e6`
+(`stage01:wip R5c repaire`), which includes the preserved user changes and
+the preceding V07 remap. Scope: local-database files and operator-managed
+environment files only, with committed environment examples kept trackable.
+
+**R5C requested repair: PASS.** Before the repair, repository-only
+`git check-ignore --no-index -v` returned exit 1 with no matches for
+`device-watch.sqlite`, `local.db`, and `deploy/.env.prod`. The current
+`.gitignore` lacked the previously approved database and environment rules.
+
+The repair adds only these two groups to `.gitignore`:
+
+```gitignore
+# Operator-managed environment files; keep committed examples trackable.
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Local databases and their journal/WAL sidecars.
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+```
+
+Existing tool/editor rules are preserved. No application, Stage 2, dependency,
+deployment, example, or operator file was changed. No database/environment
+fixture was created, and no tracked file was removed from the index.
+
+### Focused regression verification
+
+Every case was checked separately using
+`git -c core.excludesFile=NUL check-ignore --no-index -q -- <path>`.
+Expected exit status is 0 for an ignored path and 1 for a trackable path;
+any other result fails the check. Global excludes were disabled, and
+`--no-index` ensures committed examples do not mask incorrect ignore rules.
+
+| Check | Result |
+| --- | --- |
+| Local database files and sidecars | **PASS — 16/16.** Root `.db`, `.sqlite`, `.sqlite3` files; each family's `-journal`, `-wal`, and `-shm` sidecars; and nested `server/local.db`, `server/local.db-wal`, `agent/state/device-watch.sqlite`, `agent/state/local.sqlite3-shm`. |
+| Operator environment files | **PASS — 6/6.** `.env`, `.env.local`, `deploy/.env.prod`, `deploy/.env.prod.local`, `deploy/.env.dev`, `server/.env.production`. |
+| Trackable examples/configuration | **PASS — 8/8.** `.env.example`, `agent/.env.example`, `deploy/.env.dev.example`, `deploy/.env.prod.example`, `.env.prod.example`, `deploy/.env.prod.local.example`, `server/.env.production.example`, `deploy/version.env`. |
+| Exact reported failures, verbose confirmation | **PASS — exit 0.** `device-watch.sqlite` matches `*.sqlite`, `local.db` matches `*.db`, and `deploy/.env.prod` matches `.env.*`, all from the repository `.gitignore`. |
+| Committed example preservation | **PASS.** `git ls-files --error-unmatch` confirms all four committed `.env*.example` files remain tracked; `git diff --quiet HEAD` confirms those files and `deploy/version.env` are unchanged. |
+
+The two PowerShell assertion matrices exited 0: **22/22 protected paths and
+8/8 trackable paths passed**. These checks exercise Git's actual matcher and
+provide the focused regression evidence without adding a test harness or
+requiring Python, Docker, or MySQL. No broad test suite was run.
+
+This section supersedes only the local-database/environment ignore failures
+recorded in the earlier V01/V07 evidence. Other safeguard categories mentioned
+by V07, including keys, virtual environments, caches, dependencies, build output,
+and coverage, were outside the explicitly requested R5C scope and were not
+restored or classified as passing. This is not an overall V01 PASS or a new
+criterion 9 remap. V05 records the corresponding operator-env result. V07 and
+the final Stage 1 baseline are unchanged by this repair.
+
+## Earlier V01 re-verification (historical)
+
 Date: 2026-09-09
 
 Scope: Stage 1 Steps 01–03 only

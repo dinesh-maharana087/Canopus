@@ -1,5 +1,25 @@
 # Stage 1 Verification V05 — Deployment topology
 
+## R5C operator-environment ignore re-verification - 2026-09-12
+
+Base revision: `1b440ac755503155e3f74be6e24787fafa0856e6` plus R5C.
+Scope: restore only the operator-file ignore assertion invalidated by the
+`.gitignore` regression identified in V07. **Requested assertion: PASS.**
+
+`git -c core.excludesFile=NUL check-ignore --no-index -v -- deploy/.env.prod`
+changed from exit 1/no match to exit 0, matching the restored `.env.*` rule.
+Separate quiet checks confirm `deploy/.env.prod.local` is also ignored while
+`deploy/.env.prod.example` remains trackable even with `--no-index`.
+All four committed environment examples remain tracked and unchanged.
+
+The complete **22 protected / 8 trackable** case matrix and the minimal rule
+change are recorded in [V01's R5C evidence](01-repository-server-foundation.md#r5c-repository-safeguard-repair---2026-09-12).
+No deployment asset, operator value, or Stage 2 implementation was modified;
+the existing `deploy/version.env` content was preserved. No Docker/Compose/
+Caddy/runtime check was rerun, and all previously recorded runtime environment
+blocks remain. This addendum supersedes only the failed operator-ignore check;
+it does not regenerate V07 or the final Stage 1 baseline.
+
 ## R4C deployment-documentation re-verification (current)
 
 - Re-verification date: 2026-09-11.

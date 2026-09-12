@@ -4,6 +4,20 @@
 .nvmrc
 .python-version
 
+# Operator-managed environment files; keep committed examples trackable.
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Local databases and their journal/WAL sidecars.
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+
 
 # ctags
 tags
