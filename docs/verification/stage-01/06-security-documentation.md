@@ -7,6 +7,88 @@ Overall result: **FAIL**
 
 The current repository tree was verified as-is. Source code was not modified. The locked Python environment could not be invoked inside the sandbox, and the required external-access request was rejected because the workspace approval service was out of credits. Consequently, the fresh repository-verifier and audit-test executions are classified as **BLOCKED BY ENVIRONMENT**; they were not retried through another execution path.
 
+## Targeted V06 re-verification: criteria 10 and 11 - 2026-09-12
+
+Revision verified: `600ad6afe8780f546d4cc302f7bc649bd06faf19`
+(`stage01:R5B repaire completed`). The working tree was clean at the start.
+Scope: the repaired MySQL-only repository boundary and historical Stage 1
+absence boundary only. No implementation or test repair was performed.
+
+**Criterion 10: PASS. Criterion 11: PASS. Both requested criteria are verified
+PASS in this targeted re-verification.** These results supersede the older
+V06 failures for these two boundaries; the original findings remain as history.
+This is not a fresh overall V06 or Stage 1 acceptance review.
+
+| Criterion | Classification | Fresh evidence |
+| --- | --- | --- |
+| 10 — MySQL is the only database implementation represented in the project | **PASS** | Current repository audit exits 0 with zero findings. Project source/configuration/manifest inspection finds SQLite only in the two negative audit-fixture lines described below. The exact `mysql+pymysql` allowlist regression passes, accepting MySQL and rejecting unknown/HTTP database schemes and sync/async SQLite engines. |
+| 11 — No fake or partial Stage 2 workflow exists in the historical Stage 1 boundary | **PASS** | The current verifier exits 0 with zero findings against recorded snapshot `1ee0b2b723e6323531162ebe8e353f6f4670ff36`. Regression tests pass for later Stage 2 additions preserving historical acceptance and genuine Stage 1 dependencies/routes still failing. |
+
+### Boundary inspection
+
+The R5A changes were reviewed against their pre-repair source. The three
+bootstrap test files remain unchanged since `f640c13`: CLI and service use
+transaction/repository doubles; repository tests capture statements and compile
+MySQL SQL/DDL. None constructs a real SQLite engine. Production architecture
+and the verifier's positive `{"mysql+pymysql"}` allowlist remain intact.
+Engine construction in Python tests is inspected before the exemption for
+negative configuration fixtures; test files are not skipped wholesale.
+
+A fresh inventory using the verifier's existing `_project_files`/`_files`
+boundary, omitting Markdown documentation, reports exactly two matching lines:
+`deploy/tests/test_verify_repository.py:80` and `:119`. Both create text for
+negative fixtures; neither executes a SQLite engine. No SQLite-named file or
+`.db`/`.db3` file exists within that inventory. An initial `rg` scan of the four
+component areas found the same fixture lines; filename enumeration encountered
+a sandbox cache-permission error, so the completed inventory ran with host
+access. An unfiltered tracked-file cross-check also found vendor references in
+`.tmp/tls-characterization`, `.tmp/uv-tool`, and `web/node_modules`. These are
+generated/tool dependencies excluded by the approved audit boundary, not
+project database implementations. No exclusion was added or broadened.
+
+R5B preserves the strict Stage 1 source/migration boundary and applies today's
+verifier to raw files from the recorded historical commit. The selected tests
+verify that later committed modules/migrations and dirty current files cannot
+rewrite that result. Five dependency cases and nine route/prefix cases detect
+genuine leakage, including relative/package imports, router aliases, and
+interpolated paths. Historical leakage also remains detectable despite clean
+current files, archive export attributes, or Git replacements. Invalid refs
+cannot fall back to the current tree. Current-file baseline invalidation rules
+remain as explained in the R5B section below; historical PASS does not certify
+changed current Stage 1 code or Stage 2 completeness.
+
+### Checks executed
+
+All Python commands used the existing `server/.venv/Scripts/python.exe -B`
+with host access; no package installation or configuration change was needed.
+
+| Check | Result |
+| --- | --- |
+| Focused criterion 10/11 repository-audit tests | **PASS** — exit 0; **30 passed, 3 deselected in 6.65s**, no skipped or failed tests. The unrelated credential/key and production-topology tests were deselected. |
+| Ruff, audit implementation and tests | **PASS** — exit 0; all checks passed. |
+| Strict mypy, audit implementation and tests | **PASS** — exit 0; no issues in 2 source files with the unchanged server strict configuration. |
+| Current repository audit | **PASS** — exit 0; zero findings. |
+| Recorded historical Stage 1 audit | **PASS** — exit 0; printed the full recorded commit ID and no findings. |
+| Completed SQLite inventory | **PASS** — exit 0; two negative-fixture lines, zero database filename candidates within the approved inventory. |
+
+```text
+python -B -m pytest deploy/tests/test_verify_repository.py -q --tb=short -k "not security_and_dependency_findings and not quoted_credentials_and_private_key_variants and not forbidden_production_topology"
+python -B -m ruff check deploy/verify_repository.py deploy/tests/test_verify_repository.py
+# Working directory: deploy; executable: ../server/.venv/Scripts/python.exe
+python -B -m mypy --config-file ../server/pyproject.toml --explicit-package-bases verify_repository.py tests/test_verify_repository.py
+# Working directory: repository root
+python -B deploy/verify_repository.py --scope current
+python -B deploy/verify_repository.py --scope stage-one --stage-one-ref 1ee0b2b723e6323531162ebe8e353f6f4670ff36
+```
+
+V07's current rows still map criteria 10 and 11 to FAIL using pre-R5A/R5B
+evidence. That mapping was read but deliberately not updated. Unrelated V06
+findings and V01–V05 were not re-audited. The pre-existing missing CLI module/
+console entry point and unrelated bootstrap mypy errors remain separately
+recorded; they do not block the checks requested here and were not rerun or
+repaired. Only this V06 file is updated. V07 and the final baseline remain
+unchanged; no overall acceptance totals are regenerated.
+
 ## R5B historical Stage 1 scope repair - 2026-09-12
 
 Revision verified: `e919c7b` (`stage01: wip R5B repaired`) plus the focused
