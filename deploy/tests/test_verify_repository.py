@@ -352,14 +352,20 @@ def test_stage_one_module_and_exported_symbol_imports_remain_valid(
     "source",
     (
         'app.add_api_route("/api/v1/enroll", enroll)\n',
-        'from fastapi import APIRouter as Router\n'
-        'enrollment = Router()\n'
-        '@enrollment.post("/api/v1/enroll")\ndef enroll(): pass\n',
-        'from fastapi import APIRouter\n'
-        'router = APIRouter(prefix="/api/v1/enroll")\n',
+        (
+            'from fastapi import APIRouter as Router\n'
+            'enrollment = Router()\n'
+            '@enrollment.post("/api/v1/enroll")\ndef enroll(): pass\n'
+        ),
+        (
+            'from fastapi import APIRouter\n'
+            'router = APIRouter(prefix="/api/v1/enroll")\n'
+        ),
         'app.include_router(health_router, prefix="/api/v1/enroll")\n',
-        'from device_watch_server.api.health import router as health_routes\n'
-        '@health_routes.post("/api/v1/enroll")\ndef enroll(): pass\n',
+        (
+            'from device_watch_server.api.health import router as health_routes\n'
+            '@health_routes.post("/api/v1/enroll")\ndef enroll(): pass\n'
+        ),
         'routes = router\n@routes.post("/api/v1/enroll")\ndef enroll(): pass\n',
         'routes = router\nroutes.include_router(health_router, prefix="/api/v1/enroll")\n',
         'from fastapi import APIRouter\nrouter = APIRouter(prefix=f"{stage2_prefix}")\n',

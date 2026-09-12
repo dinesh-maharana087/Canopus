@@ -7,6 +7,96 @@ Overall result: **FAIL**
 
 The current repository tree was verified as-is. Source code was not modified. The locked Python environment could not be invoked inside the sandbox, and the required external-access request was rejected because the workspace approval service was out of credits. Consequently, the fresh repository-verifier and audit-test executions are classified as **BLOCKED BY ENVIRONMENT**; they were not retried through another execution path.
 
+## R5B historical Stage 1 scope repair - 2026-09-12
+
+Revision verified: `e919c7b` (`stage01: wip R5B repaired`) plus the focused
+R5B completion changes. The committed partial repair and regression tests
+were preserved. Scope: criterion 11's repository-audit boundary only.
+
+**R5B repair: PASS. Criterion 11's historical Stage 1 boundary: PASS.**
+The current verifier reports zero findings against the recorded Stage 1
+commit `1ee0b2b723e6323531162ebe8e353f6f4670ff36`. Later approved Stage 2
+enrollment/bootstrap modules and migrations remain intact.
+
+### Scope correction and baseline reuse
+
+The approved Stage 1 criterion requires no fake or partial Stage 2 workflow
+within Stage 1. V07's 2026-09-11 criterion 11 row acknowledges the historical
+Stage 1 PASS but classifies it FAIL solely because later Stage 2 work exists
+in the current tree. That interpretation conflicts with the historical/current
+distinction already recorded in the R4B evidence and the current explicit R5B
+instruction. This addendum repairs that verification boundary; it does not
+certify the completeness or correctness of Stage 2.
+
+The historical input is the same Stage 1 commit identified by R4B, now resolved
+and printed as a full commit ID. No newly chosen clean revision substitutes
+for the recorded Stage 1 baseline. `--stage-one-ref` uses today's verifier
+against that commit's raw tracked files in a temporary directory. It performs
+no checkout and executes no historical source. Git replacement objects and
+archive export attributes cannot substitute or hide the audited content.
+Invalid/non-commit references and unreadable or unsupported snapshot inputs
+fail with a sanitized diagnostic and exit 2; there is no current-tree fallback.
+
+The ordinary `--scope stage-one` audit remains strict for its supplied tree:
+later modules/migrations, non-health routes, and Stage 1 imports of later
+server functionality still fail. Absolute, relative, and package imports,
+router aliases, route registration, and route prefixes are covered. The
+existing agent/frontend absence rules and MySQL-only/security checks remain
+enabled. `--scope current` retains the repository-wide security/database/
+topology checks and cannot be combined with `--stage-one-ref`.
+
+Under `AGENTS.md` baseline reuse/invalidation rules, changes to verified
+implementation/configuration, contracts, tests/verifiers, dependencies,
+toolchain, security/absence boundaries, topology, or newly available required
+environments still require targeted re-verification of the affected current
+Stage 1 area. An immutable historical PASS does not certify modified current
+Stage 1 files. Later approved Stage 2 additions alone do not retroactively
+invalidate that historical PASS. This verifier change invalidates the relevant
+V06 audit evidence, which is re-verified here; unchanged V-areas are not rerun.
+
+### Focused regression and verification evidence
+
+The initial focused regressions reproduced the missing historical-ref command
+and dependency/route-detection gaps (**14 failed, 12 passed**). Review regressions
+then reproduced alias/interpolation and snapshot-provenance false passes
+(**7 failed, 4 passed, 22 deselected**) before the completion fixes.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Repository-audit tests | **PASS** | Exit 0: **33 passed in 4.96s**, no failures or skips. |
+| Historical Stage 1 without Stage 2 | **PASS** | Temporary Git history and the recorded real Stage 1 commit both produce zero findings with explicit commit provenance. |
+| Later approved Stage 2 additions | **PASS** | Regression commits later modules/migrations and dirties a Stage 1 file; historical acceptance stays PASS, strict current-tree Stage 1 scope fails, and Git status is unchanged by the snapshot audit. |
+| Genuine Stage 1 leakage | **PASS** | Dependency and business-route cases fail in Stage 1 scope; cleaning the working file, archive export-ignore, and Git replacements cannot conceal leakage committed in the selected snapshot. |
+| Ruff, audit and tests | **PASS** | Exit 0: all checks passed. Four R5B style diagnostics were corrected before this run. |
+| Strict mypy, audit and tests | **PASS** | Exit 0: no issues in 2 source files using the unchanged server strict configuration. |
+| Recorded historical repository audit | **PASS** | Exit 0, zero findings; printed snapshot `1ee0b2b723e6323531162ebe8e353f6f4670ff36`. |
+| Current repository/database audit | **PASS** | Exit 0, zero findings under `--scope current`; this is not a claim of current-tree Stage 2 absence. |
+
+Commands used the existing `server/.venv/Scripts/python.exe -B` with host
+access. Paths below are relative to the repository root unless stated:
+
+```text
+python -B -m pytest deploy/tests/test_verify_repository.py -q --tb=short
+python -B -m ruff check deploy/verify_repository.py deploy/tests/test_verify_repository.py
+# Working directory: deploy; executable: ../server/.venv/Scripts/python.exe
+python -B -m mypy --config-file ../server/pyproject.toml --explicit-package-bases verify_repository.py tests/test_verify_repository.py
+# Working directory: repository root
+python -B deploy/verify_repository.py --scope stage-one --stage-one-ref 1ee0b2b723e6323531162ebe8e353f6f4670ff36
+python -B deploy/verify_repository.py --scope current
+```
+
+The initial root-directory mypy invocation stopped on duplicate module names
+(`deploy.verify_repository` / `verify_repository`). Running from `deploy`
+with explicit package bases matches the tests' existing import boundary;
+no mypy configuration, ignore, or type relaxation was added.
+
+Only `deploy/verify_repository.py`, `deploy/tests/test_verify_repository.py`,
+and this V06 evidence are affected by R5B. The pre-existing missing
+`enrollment.cli`/console entry point and unrelated bootstrap typing failures
+remain separately recorded in R5A; they do not block these audit checks and
+were not repaired or rerun. V07, the consolidated baseline, and the overall
+Stage 1 acceptance totals are deliberately not updated in this batch.
+
 ## R5A introduced typing-regression repair - 2026-09-12
 
 Base revision: `600f6b2` plus the preserved 37-line V06 verification addendum.

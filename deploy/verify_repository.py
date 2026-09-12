@@ -7,7 +7,6 @@ import ast
 import io
 import re
 import subprocess
-import tarfile
 from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import Enum
@@ -326,7 +325,13 @@ def _stage_one_route_violation(tree: ast.Module) -> bool:
     factories = {"APIRouter", "FastAPI"}
     routers = {"app", "router"}
     for node in ast.walk(tree):
-        if isinstance(node, ast.ImportFrom) and node.module == "fastapi":
+        if not isinstance(node, ast.ImportFrom):
+            continue
+        routers.update(
+            alias.asname or alias.name for alias in node.names
+            if alias.name == "router" or alias.name.endswith("_router")
+        )
+        if node.module == "fastapi":
             factories.update(
                 alias.asname or alias.name for alias in node.names
                 if alias.name in {"APIRouter", "FastAPI"}
@@ -338,10 +343,25 @@ def _stage_one_route_violation(tree: ast.Module) -> bool:
             or isinstance(call.func, ast.Attribute) and call.func.attr in {"APIRouter", "FastAPI"}
         )
 
-    for node in ast.walk(tree):
-        if isinstance(node, (ast.Assign, ast.AnnAssign)) and isinstance(node.value, ast.Call) and is_factory(node.value):
-            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
-            routers.update(target.id for target in targets if isinstance(target, ast.Name))
+    def route_text(value: ast.expr) -> str | None:
+        # URL scheme scanning may ignore interpolation; exact route paths must not.
+        if any(isinstance(part, ast.FormattedValue) for part in ast.walk(value)):
+            return None
+        return _literal_text(value)
+
+    previous_count = -1
+    while previous_count != len(routers):
+        previous_count = len(routers)
+        for node in ast.walk(tree):
+            if not isinstance(node, (ast.Assign, ast.AnnAssign)):
+                continue
+            is_router = (
+                isinstance(node.value, ast.Call) and is_factory(node.value)
+                or isinstance(node.value, ast.Name) and node.value.id in routers
+            )
+            if is_router:
+                targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+                routers.update(target.id for target in targets if isinstance(target, ast.Name))
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
             continue
@@ -351,14 +371,16 @@ def _stage_one_route_violation(tree: ast.Module) -> bool:
             and isinstance(node.func.value, ast.Name)
             and node.func.value.id in routers else ""
         )
-        if is_factory(node) or method == "include_router":
-            if any(keyword.arg == "prefix" and _literal_text(keyword.value) != "" for keyword in node.keywords):
-                return True
+        if (is_factory(node) or method == "include_router") and any(
+            keyword.arg == "prefix" and route_text(keyword.value) != ""
+            for keyword in node.keywords
+        ):
+            return True
         if method in {"get", "post", "put", "patch", "delete", "head", "options", "trace", "websocket", "api_route", "add_api_route", "add_api_websocket_route"}:
             path = node.args[0] if node.args else next(
                 (keyword.value for keyword in node.keywords if keyword.arg == "path"), None,
             )
-            if path is None or _literal_text(path) not in _HEALTH_ROUTES:
+            if path is None or route_text(path) not in _HEALTH_ROUTES:
                 return True
     return False
 
@@ -475,11 +497,51 @@ def audit_repository(
     return findings
 
 
-def _git_bytes(root: Path, *args: str) -> bytes:
+def _git_bytes(root: Path, *args: str, input_data: bytes | None = None) -> bytes:
     return subprocess.run(
-        ["git", "-C", str(root), *args],
-        check=True, capture_output=True, timeout=30,
+        ["git", "--no-replace-objects", "-C", str(root), *args],
+        input=input_data, check=True, capture_output=True, timeout=30,
     ).stdout
+
+
+def _write_snapshot(root: Path, commit: str, snapshot: Path) -> None:
+    """Read raw committed blobs; archive export attributes cannot hide source."""
+    entries: list[tuple[bytes, Path]] = []
+    tree = _git_bytes(root, "ls-tree", "-rz", "--full-tree", commit)
+    for entry in tree.split(b"\0"):
+        if not entry:
+            continue
+        metadata, name = entry.split(b"\t", 1)
+        mode, kind, object_id = metadata.split()
+        relative = Path(name.decode("utf-8"))
+        if relative.is_absolute() or relative.drive or ".." in relative.parts:
+            raise ValueError("unsafe snapshot path")
+        if _excluded(relative):
+            continue
+        if kind != b"blob" or mode not in {b"100644", b"100755"}:
+            raise ValueError("snapshot contains an unsupported file type")
+        target = (snapshot / relative).resolve()
+        if not target.is_relative_to(snapshot) or target == snapshot:
+            raise ValueError("unsafe snapshot path")
+        entries.append((object_id, target))
+    if not entries:
+        return
+    objects = io.BytesIO(_git_bytes(
+        root, "cat-file", "--batch",
+        input_data=b"\n".join(object_id for object_id, _ in entries) + b"\n",
+    ))
+    for object_id, target in entries:
+        header = objects.readline().split()
+        if len(header) != 3 or header[:2] != [object_id, b"blob"]:
+            raise ValueError("unreadable snapshot object")
+        size = int(header[2])
+        if size < 0:
+            raise ValueError("invalid snapshot object size")
+        content = objects.read(size)
+        if len(content) != size or objects.read(1) != b"\n":
+            raise ValueError("incomplete snapshot object")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(content)
 
 
 def audit_stage_one_ref(root: Path, revision: str) -> tuple[str, list[Finding]]:
@@ -489,11 +551,9 @@ def audit_stage_one_ref(root: Path, revision: str) -> tuple[str, list[Finding]]:
     ).decode("ascii").strip()
     if not re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", commit):
         raise ValueError("invalid commit identity")
-    archive = _git_bytes(root, "archive", "--format=tar", commit)
     with TemporaryDirectory(prefix="device-watch-stage-one-") as directory:
-        snapshot = Path(directory)
-        with tarfile.open(fileobj=io.BytesIO(archive), mode="r:") as source:
-            source.extractall(snapshot, filter="data")
+        snapshot = Path(directory).resolve()
+        _write_snapshot(root, commit, snapshot)
         return commit, audit_repository(snapshot, scope=AuditScope.STAGE_ONE)
 
 
@@ -517,7 +577,7 @@ def main(argv: list[str] | None = None) -> int:
             parser.error("--stage-one-ref requires --scope stage-one")
         try:
             commit, findings = audit_stage_one_ref(args.root.resolve(), args.stage_one_ref)
-        except (OSError, subprocess.SubprocessError, tarfile.TarError, ValueError):
+        except (OSError, subprocess.SubprocessError, ValueError):
             print("historical-snapshot: unable to audit the requested Stage 1 commit")
             return 2
         print(f"Stage 1 snapshot: {commit}")
