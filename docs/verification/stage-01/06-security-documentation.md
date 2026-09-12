@@ -7,6 +7,110 @@ Overall result: **FAIL**
 
 The current repository tree was verified as-is. Source code was not modified. The locked Python environment could not be invoked inside the sandbox, and the required external-access request was rejected because the workspace approval service was out of credits. Consequently, the fresh repository-verifier and audit-test executions are classified as **BLOCKED BY ENVIRONMENT**; they were not retried through another execution path.
 
+## R5A introduced typing-regression repair - 2026-09-12
+
+Base revision: `600f6b2` plus the preserved 37-line V06 verification addendum.
+Scope: repair only mypy errors introduced by R5A; do not repair pre-existing
+typing defects or the missing CLI implementation.
+
+**Requested R5A typing repair: PASS. Criterion 10's MySQL-only implementation
+boundary: PASS.** No R5A-introduced mypy diagnostic remains. The full test/type
+check set still has the separate pre-existing failures recorded below; it is
+not represented as wholly passing or as Stage 1 acceptance.
+
+### Attribution before editing
+
+Strict source-aware mypy first reproduced all 12 diagnostics. Comparing the
+R5A changes against `3554078` and the earlier `c68b1cb` source, independently
+reviewed, establishes this split (line numbers are those before this repair):
+
+| Location / diagnostic | Attribution | Action |
+| --- | --- | --- |
+| CLI line 105, `[unused-ignore]` | **R5A introduced** | Removed the added, ineffective `ignore[arg-type]`. |
+| CLI line 257, `[call-overload]` and `[unused-ignore]` | **R5A introduced** | Replaced the new revoke wrapper's untyped keyword forwarding with explicit typed print parameters and named forwarding; removed its ignore. |
+| CLI line 105, `[call-overload]` | **Pre-existing** | Preserved the original create wrapper and its existing diagnostic. |
+| CLI line 22, missing `cli` attribute | **Pre-existing** | No CLI module, stub, skip, or console entry point was added. |
+| Service lines 115, 119, 120, 136, 137, Settings `[arg-type]` | **Pre-existing (5)** | Left unchanged. |
+| Service lines 355, 457, lambda `[misc]` | **Pre-existing (2)** | Left unchanged. |
+
+Exactly **3 diagnostics were introduced by R5A; 9 were pre-existing**.
+
+Only `server/tests/unit/test_bootstrap_cli.py` changed: the existing create
+wrapper lost the R5A-added ignore, and the new revoke wrapper now declares
+`sep`/`end` as `str | None`, `file` as `TextIO | None`, and `flush` as `bool`.
+It forwards those keywords explicitly to the real print function, preserving
+the defaults and event ordering. The transaction and repository doubles are
+unchanged. No `Any`, ignore, mypy setting, database dependency, or production
+change was introduced.
+
+### Post-repair verification
+
+| Check | Classification | Evidence |
+| --- | --- | --- |
+| R5A-introduced typing diagnostics | **PASS** | Same strict source-aware mypy scope changed from 12 to **9 errors**, with exactly the three introduced diagnostics removed and no new diagnostic. |
+| Full strict mypy, three test files | **FAIL (pre-existing only)** | Exit 1: 9 errors in 2 files (3 checked). CLI: missing module attribute and original create print overload. Service: five Settings argument-type errors and two lambda-inference errors. Repository: no diagnostics. |
+| Combined three bootstrap test modules | **FAIL (pre-existing collection defect)** | Exit 1: `test_bootstrap_cli.py:22` cannot import `device_watch_server.enrollment.cli`. Collection stops before any test body runs. |
+| Independent repository/service tests | **PASS** | Exit 0: **35 passed in 0.74s**, no failures or skips. |
+| Ruff, all three test files | **PASS** | Exit 0: all checks passed. |
+| Current repository/database audit | **PASS** | Exit 0, zero findings from `deploy/verify_repository.py --scope current`. The source scan still finds SQLite only in the unchanged negative audit fixtures. |
+
+Commands used the existing `server/.venv/Scripts/python.exe -B` with host
+access; strict mypy retained `MYPYPATH=D:/canopus/Canopus/server/src` and
+`--config-file server/pyproject.toml`. The exact focused file lists and test/
+audit commands are recorded in the verification history below.
+No package was installed, configuration weakened, or unrelated suite run.
+
+The missing CLI module blocks only the CLI module's own collection and the
+ordinary combined invocation; the separate 35-test run verifies the other
+two modules. The missing `device-watch-bootstrap` console entry point remains
+a separate pre-existing contract, and its test body is unreachable until
+collection succeeds. These are implementation defects, not environment blocks.
+
+This requested repair batch is clean: all R5A-introduced mypy errors are fixed
+and the MySQL-only implementation boundary is PASS. Only the CLI test and V06
+evidence changed. The existing V06 addendum was preserved; V07 and the final
+baseline were not updated. R5B was not started.
+
+Final `git status --short` and `git diff --stat` confirm those two changed
+files only; `git diff --check` passes with no output.
+
+## R5A resumed verification conclusion - 2026-09-12
+
+Revision verified: `600f6b2` (`stage01: wip R5A`). The previously reviewed
+repair is now committed. The working tree was clean at resume, and the three
+test files retain the previously inspected content. Only this evidence file
+was changed during the resumed verification.
+
+**MySQL-only repository boundary: PASS. Requested R5A closure checks: FAIL.**
+Criterion 10 cannot be closed as fully verified PASS under the requested
+verification set. All requested tools now execute with host access; the
+remaining failures are implementation/test defects, not environment blocks.
+
+| Fresh check | Classification | Result |
+| --- | --- | --- |
+| Combined three bootstrap modules | **FAIL** | Exit 1; one collection error at `test_bootstrap_cli.py:22` because `device_watch_server.enrollment.cli` is absent. No test body runs in this combined invocation. |
+| Repository/service follow-up | **PASS** | Exit 0; **35 passed in 0.93s**, no failures or skips. |
+| Ruff on all three modules | **PASS** | Exit 0; all checks passed. |
+| Strict source-aware mypy on all three modules | **FAIL** | Exit 1; **12 errors in 2 files (3 checked)**, matching the detailed diagnostics and provenance in the following section. The repository test has no diagnostics. |
+| Current repository/database audit | **PASS** | Exit 0; zero findings from `deploy/verify_repository.py --scope current`. The unchanged positive MySQL allowlist accepts the repaired repository. |
+
+The same focused commands listed in the 2026-09-11 section were rerun using
+`server/.venv/Scripts/python.exe -B`; mypy used
+`MYPYPATH=D:/canopus/Canopus/server/src`. No package installation, broad test
+suite, live MySQL check, repair, skip, or CLI stub was introduced.
+
+The pre-existing missing CLI module prevents the required CLI tests from
+collecting and aborts ordinary combined collection; the independent 35-test
+run establishes the unaffected modules' result. The separately missing
+`device-watch-bootstrap` console entry point remains absent, and its test
+body was not reached. The R5A print-wrapper typing regressions and pre-existing
+service-test typing errors described below also remain unresolved. Their
+classification was not weakened to obtain a PASS.
+
+V07, the final Stage 1 baseline, and implementation files remain unchanged.
+R5B was not started. Final status/diff review shows only this V06 update;
+`git diff --check` passes.
+
 ## R5A re-verification with installed test tools - 2026-09-11
 
 Scope: criterion 10 only, against `3554078` plus the existing R5A repair.

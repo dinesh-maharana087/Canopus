@@ -10,7 +10,7 @@ from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
-from typing import cast
+from typing import TextIO, cast
 from unittest.mock import Mock
 from uuid import UUID
 
@@ -102,7 +102,7 @@ def test_create_prints_plaintext_once_only_after_commit(
 
     def recording_print(*args: object, **kwargs: object) -> None:
         events.append("print")
-        real_print(*args, **kwargs)  # type: ignore[arg-type]
+        real_print(*args, **kwargs)
 
     monkeypatch.setattr(builtins, "print", recording_print)
 
@@ -252,9 +252,15 @@ def test_revoke_dispatches_the_id_and_commits_before_reporting_success(
 
     real_print = builtins.print
 
-    def recording_print(*args: object, **kwargs: object) -> None:
+    def recording_print(
+        *args: object,
+        sep: str | None = " ",
+        end: str | None = "\n",
+        file: TextIO | None = None,
+        flush: bool = False,
+    ) -> None:
         engine.events.append("print")
-        real_print(*args, **kwargs)  # type: ignore[arg-type]
+        real_print(*args, sep=sep, end=end, file=file, flush=flush)
 
     monkeypatch.setattr(builtins, "print", recording_print)
 
