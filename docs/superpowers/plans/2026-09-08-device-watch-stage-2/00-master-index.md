@@ -11,7 +11,7 @@ Stage 2 adds enrollment, device identity, authenticated minimal heartbeats, and 
 | 03 | Bootstrap provisioning and persistence | 01, 02 | Pending |
 | 04 | Credential hashing and verification primitives | 01 | Complete |
 | 05 | Enrollment transaction service | 02, 03, 04 | Pending |
-| 06 | Enrollment API contract and endpoint | 05 | Pending |
+| 06 | Enrollment API contract and endpoint | 05 | Complete |
 | 07 | Agent secure identity storage | Stage 1 agent | Pending |
 | 08 | Agent enrollment client | 06, 07 | Pending |
 | 09 | Heartbeat protocol contracts and idempotency | 01, 04 | Pending |
@@ -85,7 +85,7 @@ Health-only Stage 1 routes remain available; the existing app factory/lifespan r
 
 ## Current Handoff
 
-[Step 05](05-enrollment-service.md) implementation exists: one transaction consumes the locked bootstrap and inserts a device plus its credential hash, returning the transient credential only after commit. Focused unit, offline migration, Ruff, and strict mypy checks pass. Its required real-MySQL concurrency, rollback, and migration checks are **BLOCKED BY ENVIRONMENT**, so Step 05 remains Pending and its full definition of done is not yet verified. [Step 03](03-bootstrap-provisioning.md) retains its MySQL verification block and Pending status; [Step 04](04-credential-primitives.md) remains Complete. See the [current progress record](../../../progress/current-status.md) for commands, evidence, and transaction/retry contracts. Complete the outstanding MySQL verification before treating these persistence contracts as proved. Step 06 has not started and requires a separate explicit request.
+[Step 06](06-enrollment-api.md) is complete at the API boundary: `POST /api/v1/enrollment` validates the four-field request, returns the five-field `201` contract, and sanitizes validation and service failures without secret echo. API, health/lifecycle regression, logging, Ruff, and strict mypy checks pass. [Step 03](03-bootstrap-provisioning.md) and [Step 05](05-enrollment-service.md) retain their **BLOCKED BY ENVIRONMENT** MySQL verification and Pending statuses; API tests do not prove database atomicity, concurrency, or migration behavior. See the [current progress record](../../../progress/current-status.md) for commands, status codes, and deployment assumptions. Step 07 has not started and requires a separate explicit request.
 
 ## Planning Boundary
 

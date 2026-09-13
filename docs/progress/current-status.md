@@ -923,3 +923,121 @@ environment. Step 06 remains unstarted and requires a separate explicit request
 and review of these prerequisites. No HTTP endpoint, agent enrollment,
 heartbeat, connectivity, metric, or frontend behavior was added. No commit or
 branch change was made by the agent. Stop after this handoff.
+
+## Stage 2 Step 06 Completion — 2026-09-13
+
+Status: **Complete — Step 06 API-layer definition of done satisfied.**
+
+Executed only the enrollment API card from clean HEAD `d343676`. The user's
+commit preserved the completed Step 05 implementation work; its commit title
+does not supersede the recorded real-MySQL verification block. The explicit
+Step 06 request authorized API work using those implemented service contracts,
+without treating the outstanding persistence checks as proved. Steps 03 and 05
+remain Pending. The preceding Step 05 handoff is historical.
+
+Implemented `POST /api/v1/enrollment` through the existing versioned router and
+app factory. The synchronous handler executes the blocking transaction through
+FastAPI's worker-thread handling. Factory wiring supplies the configured
+bootstrap pepper and one shared, centrally constructed engine to the existing
+Step 05 service. Readiness uses that same cached engine. Lazy initialization is
+protected by a lock; lifespan still owns disposal. An injected readiness check
+retains its existing health behavior. The transaction, credential primitives,
+bootstrap primitives, MySQL/TLS configuration, migrations, and deployment files
+were not changed.
+
+Wire contract and handoff:
+
+- All four JSON request fields are required; extra fields are rejected.
+  `protocol_version` must be integer `1`, including rejection of boolean,
+  floating-point, and string equivalents. `bootstrap_secret` must be the
+  canonical 50-character Step 03 wire value. It is held as `SecretStr` in the
+  request model. `display_name` and `agent_version` must be strings of 1–120 and
+  1–64 characters respectively, trimmed and nonblank. Length limits apply before
+  trimming, consistent with the existing domain contract. Agent version is
+  validated here; storing the latest version remains later heartbeat work.
+- A committed success returns **201** with exactly `protocol_version`,
+  `device_id`, `display_name`, `credential`, and `created_at`. The returned
+  identity is UUIDv4 with the service's UTC timestamp. Explicit field mapping
+  excludes lifecycle, bootstrap, hash, and persistence records. The credential
+  is exposed only in this success response; its model representation is masked.
+  This is the approved one-time delivery exception to the specification's
+  general credential-absence language, not permission to expose it elsewhere.
+- Invalid/missing fields, malformed JSON, invalid UTF-8, unsupported protocol,
+  non-JSON bodies, and the service's opaque `EnrollmentError` return **400** with
+  exactly `{"detail":"Enrollment failed"}`. Invalid, expired, consumed, and
+  revoked bootstraps already converge on that error at the service boundary.
+  Expected database/issuance errors that Step 05 maps to `EnrollmentError` also
+  receive 400; no internal failure taxonomy is exposed.
+- Unexpected service or response-validation/serialization failures return
+  **500** with the same generic body. A route-local `APIRoute` wrapper prevents
+  FastAPI's default detailed validation body or exception diagnostics from
+  exposing input or transient output. Its intentional final `Exception` catch
+  has a narrowly documented Ruff exception for this secret boundary. Other
+  routes retain their existing exception handling.
+- Success and handled failures set `Cache-Control: no-store`. OpenAPI documents
+  the request, five-field success, and generic failures without the default
+  detailed 422 validation schema. The existing request middleware still emits
+  only normalized route metadata; no body, authorization header, bootstrap,
+  credential, or error traceback is logged by this endpoint.
+- There is no enrollment replay or automatic service retry. A response lost or
+  failing serialization after commit does not make the bootstrap reusable;
+  callers need operator recovery for an uncertain outcome. A failure response
+  never retrieves or redisplays the earlier credential.
+
+Deployment assumptions are unchanged: agents use outbound **HTTPS** to Caddy;
+Caddy preserves `/api/*` while proxying to the private FastAPI service. TLS
+terminates at Caddy, so the internal upstream may use HTTP. No public backend
+port, new proxy route, authentication system, or TLS workaround was added.
+Production OpenAPI remains disabled. The existing Caddy route and server launch
+configuration were inspected for this boundary; no container runtime check or
+broader deployment re-audit was performed.
+
+Files created or modified:
+
+- `server/src/device_watch_server/api/enrollment.py`
+- `server/src/device_watch_server/api/enrollment_schemas.py`
+- `server/src/device_watch_server/api/router.py`
+- `server/src/device_watch_server/app.py`
+- `server/tests/unit/test_enrollment_api.py`
+- `server/tests/unit/test_app.py` (current route allowlist only)
+- `docs/progress/current-status.md`
+- `docs/superpowers/plans/2026-09-08-device-watch-stage-2/00-master-index.md`
+
+Verification (repository root, existing host-access interpreter):
+
+```powershell
+& server/.venv/Scripts/python.exe -B -m pytest server/tests/unit/test_enrollment_api.py server/tests/unit/test_app.py server/tests/unit/test_step06_logging_cli.py server/tests/unit/test_enrollment_transaction.py -q --tb=short
+& server/.venv/Scripts/python.exe -B -m ruff check server/src/device_watch_server/api/enrollment.py server/src/device_watch_server/api/enrollment_schemas.py server/src/device_watch_server/api/router.py server/src/device_watch_server/app.py server/tests/unit/test_enrollment_api.py server/tests/unit/test_app.py
+& server/.venv/Scripts/python.exe -B -m mypy --config-file server/pyproject.toml server/src/device_watch_server/api/enrollment.py server/src/device_watch_server/api/enrollment_schemas.py server/src/device_watch_server/api/router.py server/src/device_watch_server/app.py server/tests/unit/test_enrollment_api.py
+```
+
+| Check | Result |
+| --- | --- |
+| Focused pytest suite | **PASS**, 66 tests: 40 API, 8 app/health/lifespan, 6 existing logging/CLI, and 12 Step 05 service tests; exit 0 |
+| Scoped Ruff | **PASS**, 6 Python files, exit 0 |
+| Strict mypy | **PASS**, 5 changed/new source and API-test files, exit 0; legacy app-test annotations remain outside this source-focused gate |
+| Independent API/security review | **PASS**, no concrete correctness, security, or scope defect found |
+| Final Git status, diff, diff-stat, and whitespace checks | **PASS**, only the eight scoped files changed; no whitespace errors |
+| Real MySQL atomicity, concurrency, rollback, and migration evidence | **BLOCKED BY ENVIRONMENT**, inherited from Steps 03/05; unchanged and not rerun or relabeled by Step 06 |
+
+The initial API run failed because the route and factory wiring were absent
+(37 failed, 7 existing tests passed). The final suite covers required fields,
+strict types/version, canonical bootstrap format, text bounds, malformed body
+shapes/encoding, success projection, service rejection without replay output,
+generic unexpected and response-validation failures, log capture, model
+representations, OpenAPI, route allowlist, health regressions, and shared engine
+ownership/disposal. API tests isolate the service boundary; they do not replace
+the pending MySQL tests or establish full A03/A05/A16 runtime acceptance.
+
+Two warnings come from the already pinned TestClient dependency stack:
+Starlette's `httpx` deprecation and AnyIO's `BlockingPortal` alias deprecation.
+No dependency installation or unrelated warning repair was performed. The
+earlier full-server logging annotation finding was not repaired or relabeled;
+no full-server mypy gate is claimed. Historical Stage 1 evidence is unchanged;
+the affected current health/router/lifecycle behavior was checked by the focused
+regressions above. No Step 06 implementation FAIL remains.
+
+Only Step 06 is newly marked Complete. Step 07 requires a separate explicit
+request; no agent storage/enrollment, heartbeat, connectivity, metrics, UI,
+operator/RBAC, listing, or credential-rotation endpoint was started. No commit
+or branch change was made. Stop after this handoff.

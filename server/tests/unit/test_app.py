@@ -116,12 +116,13 @@ def test_readiness_logs_one_fixed_sanitized_failure_event(caplog) -> None:
     assert "private-pass" not in failure_records[0].getMessage()
 
 
-def test_only_stage_one_health_routes_are_registered() -> None:
+def test_only_health_and_stage_two_enrollment_routes_are_registered() -> None:
     app = app_module.create_app(make_settings())
 
     paths = set(app.openapi()["paths"])
 
-    assert paths == {"/api/v1/health/live", "/api/v1/health/ready"}
+    assert paths == {"/api/v1/health/live", "/api/v1/health/ready", "/api/v1/enrollment"}
+    assert set(app.openapi()["paths"]["/api/v1/enrollment"]) == {"post"}
 
 
 def test_production_disables_openapi_routes() -> None:
