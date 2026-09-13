@@ -1,6 +1,6 @@
 # Device Watch Stage 2 Plan
 
-Stage 2 adds enrollment, device identity, authenticated minimal heartbeats, and current connectivity state on top of the completed Stage 1 foundation. This directory is planning-only; all statuses are Pending and no Stage 2 implementation has started.
+Stage 2 adds enrollment, device identity, authenticated minimal heartbeats, and current connectivity state on top of the verified Stage 1 foundation. This directory records the original planning set and current implementation statuses. Execute only the explicitly requested step.
 
 ## Execution Matrix
 
@@ -9,7 +9,7 @@ Stage 2 adds enrollment, device identity, authenticated minimal heartbeats, and 
 | 01 | Domain contracts and persistence boundaries | Stage 1 | Complete |
 | 02 | Device identity migration | 01 | Complete |
 | 03 | Bootstrap provisioning and persistence | 01, 02 | Pending |
-| 04 | Credential hashing and verification primitives | 01 | Pending |
+| 04 | Credential hashing and verification primitives | 01 | Complete |
 | 05 | Enrollment transaction service | 02, 03, 04 | Pending |
 | 06 | Enrollment API contract and endpoint | 05 | Pending |
 | 07 | Agent secure identity storage | Stage 1 agent | Pending |
@@ -83,9 +83,9 @@ graph TD
 
 Health-only Stage 1 routes remain available; the existing app factory/lifespan remains the ownership boundary; MySQL/PyMySQL and Alembic remain the database stack; migration history starts at `20260831_0001`; logging remains secret-safe; Caddy remains the only public ingress; `/api` remains path-preserved; agent runtime remains outbound-only; and the collector registry remains empty because heartbeats are connectivity transport, not metric collection.
 
-## Recommended Step 01
+## Current Handoff
 
-Execute [03-bootstrap-provisioning.md](03-bootstrap-provisioning.md) next. Step 02 added the reversible device identity migration from the Stage 1 baseline and verified that no bootstrap, credential, heartbeat, connectivity, or Stage 3 tables exist yet.
+[Step 04](04-credential-primitives.md) is complete: isolated Argon2id credential generation, verification, revocation, and rotation primitives pass focused checks. [Step 03](03-bootstrap-provisioning.md) implementation exists but its real-MySQL verification remains blocked; its Pending status is unchanged. See the [current progress record](../../../progress/current-status.md) for both evidence boundaries. Step 05 remains unstarted and requires an explicit request and prerequisite review.
 
 ## Planning Boundary
 

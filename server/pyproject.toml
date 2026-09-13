@@ -9,6 +9,7 @@ description = "Device Watch FastAPI server foundation"
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "alembic==1.19.1",
+    "argon2-cffi==25.1.0",
     "fastapi==0.141.1",
     "pydantic-settings==2.15.0",
     "pymysql==1.2.0",

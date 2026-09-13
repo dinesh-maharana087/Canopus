@@ -693,3 +693,104 @@ explicit instruction is **Step 04 — Credential hashing and verification primit
 Step 05 must not treat its blocked persistence evidence as PASS.
 No Step 04, device credentials, enrollment/device-creation service or API, agent,
 heartbeat, connectivity, metrics, or frontend behavior was implemented.
+
+## Stage 2 Step 04 Completion — 2026-09-13
+
+Status: **Complete — Step 04 definition of done satisfied**.
+
+Executed only the credential-primitives card from clean HEAD `36106a1`.
+The preceding Step 03 statements are its historical handoff. Its runtime
+verification blocks remain unchanged; Step 04 depends on Step 01 and needs
+no database execution. The Stage 1 baseline and historical evidence were preserved.
+
+Implemented independently tested primitives in
+`device_watch_server.auth.credentials`:
+
+- `CredentialValue.parse()` / `to_wire()` define an 83-character format:
+  `dwc_v1_<32 lowercase hex characters>_<43 unpadded base64url characters>`.
+  The lookup ID uses 16 random bytes; the secret uses a separate 32 random
+  bytes. Neither is derived from device identity. Parsing rejects unsupported
+  versions, noncanonical encodings, wrong types/lengths, padding and whitespace.
+- `issue_credential()` returns separate transient `CredentialValue` and
+  hash-only `CredentialRecord` inputs. `hash_credential()` hashes only the secret
+  with a fresh library-generated salt. The record carries key ID, encoded hash,
+  and aware UTC created/revoked/replaced timestamps; no plaintext, device foreign
+  key, last-used update, or database schema is introduced in this step.
+- `verify_credential()` returns only a boolean. It rejects malformed/unknown,
+  mismatched-ID, revoked, replaced, or unsupported-hash inputs. Native Argon2
+  verification compares the secret; hashes are never compared with a custom
+  password comparison. Stored PHC encodings must be exactly 97 characters with
+  the supported parameters and canonical Base64 before native work begins.
+- `revoke_credential()` returns an immutable terminal record and rejects repeated
+  transitions or timestamps before creation. `rotate_credential()` prepares a
+  fresh issuance plus the old record with equal revoked/replaced timestamps.
+  The original remains unchanged, including if replacement hashing fails.
+  **The future caller must validate current state and persist both rotation
+  records in one transaction before delivering the replacement.** No writes,
+  transaction service, HTTP authentication, or rotation API were added.
+- Secret-bearing carriers mask their default string/repr output. Native hashing
+  errors become `Credential operation failed` without chained diagnostics;
+  verification errors return false. Callers must never log `.secret`,
+  `.secret_hash`, or `to_wire()`, and must never serialize a persistence record
+  as an API response. Plaintext remains transient for later one-time delivery.
+
+Dependency and timing review:
+
+- Added exact runtime pin `argon2-cffi==25.1.0`. The lock adds only
+  `argon2-cffi-bindings==26.1.0`, `cffi==2.1.1`, and `pycparser==3.0` beneath it.
+  A parsed comparison against HEAD confirmed zero existing locked versions
+  changed. Installation and native hashing/verification succeeded on the
+  existing CPython 3.12.10 Windows environment; no agent dependency was added.
+- Parameters are explicit Argon2id version 19, 65,536 KiB memory, three passes,
+  four lanes, 16-byte random salts, and 32-byte outputs. This implements the
+  library's [RFC 9106 low-memory profile](https://raw.githubusercontent.com/hynek/argon2-cffi/25.1.0/src/argon2/profiles.py)
+  rather than depending on mutable defaults. The
+  [reviewed package](https://pypi.org/project/argon2-cffi/25.1.0/) supplies typed
+  APIs and native bindings, avoiding a custom password-hash implementation.
+- The [Python verification API](https://argon2-cffi.readthedocs.io/en/25.1.0/api.html#argon2.PasswordHasher.verify)
+  trusts encoded hash parameters; the primitive therefore bounds and validates
+  them before verification. The
+  [native comparison](https://github.com/P-H-C/phc-winner-argon2/blob/f57e61e19229e23c4445b85494dbf7c07de721cb/src/argon2.c#L219)
+  processes all hash bytes without an early mismatch exit. Malformed inputs,
+  public lookup mismatches, and terminal states may return early: this is not
+  an equal-time guarantee for future HTTP requests or database lookups.
+  Allow 64 MiB per active hash operation when later services size concurrency.
+  Any future hash-profile migration requires an explicit compatibility change.
+
+Files created or modified:
+
+- `server/src/device_watch_server/auth/__init__.py`
+- `server/src/device_watch_server/auth/credentials.py`
+- `server/tests/unit/test_credential_primitives.py`
+- `server/pyproject.toml`
+- `server/uv.lock`
+- `docs/progress/current-status.md`
+- `docs/superpowers/plans/2026-09-08-device-watch-stage-2/00-master-index.md`
+
+Verification (repository root; existing interpreter used with host access):
+
+| Check | Result |
+| --- | --- |
+| `python -B -m pytest server/tests/unit/test_credential_primitives.py server/tests/unit/test_stage2_domain_contracts.py -q --tb=short` | **PASS**, 49 tests: 42 credential and 7 prerequisite-contract tests |
+| `python -B -m ruff check server/src/device_watch_server/auth server/tests/unit/test_credential_primitives.py` | **PASS**, exit 0 |
+| `python -B -m mypy --config-file server/pyproject.toml server/src/device_watch_server/auth server/tests/unit/test_credential_primitives.py` | **PASS**, strict checking of 3 files, exit 0 |
+| `uv tree --project server --locked --no-dev` | **PASS**, reviewed Argon2 chain and preserved existing runtime dependencies |
+| `uv tree --project agent --locked --no-dev` | **PASS**, agent remains runtime-dependency-free |
+| Dependency lock comparison against HEAD | **PASS**, only the four expected packages added; no prior version changed |
+| Focused security/API review | **PASS**, no blocking defect; stored-hash canonical-encoding negative coverage added |
+| `git status --short`, `git diff --stat`, `git diff`, `git diff --check` | **PASS**, only the listed files changed; no whitespace errors |
+
+The `python` commands above used `server/.venv/Scripts/python.exe`. The tests
+first failed on the absent auth module, then passed against the implementation
+and pinned native library. Coverage includes secure random generation, repeated
+hashing with fresh salts, wrong secrets/IDs, malformed values, unsupported or
+excessive-cost hashes, noncanonical salt/digest encodings, lifecycle transitions,
+immutable rotation, sanitized native failures, and log/representation redaction.
+
+No Step 04 FAIL or environment block remains. The earlier full-server logging
+annotation finding and Step 03 MySQL blocks are outside this scope and were not
+repaired, rerun, or relabeled. No unchanged Stage 1 suite was re-audited. Only
+Step 04 is marked Complete in the master index; Step 03 remains Pending.
+Step 05 was not started. It requires a new explicit instruction and review of
+its prerequisites, including the outstanding Step 03 persistence evidence.
+No commit or branch change was made.
