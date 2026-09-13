@@ -34,6 +34,26 @@ FIXED_WIRE_VALUE = "dwb_v1_AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE"
 FIXED_BOOTSTRAP_ID = UUID("c919f0d6-17a7-4b4c-b579-e1cc4ce2bb03")
 
 
+@pytest.fixture(autouse=True)
+def protected_terminal(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(type(sys.stdout), "isatty", lambda self: True)
+
+
+def test_create_refuses_redirected_output_before_provisioning(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(sys.stdout, "isatty", lambda: False)
+    monkeypatch.setattr(bootstrap_cli, "load_settings", lambda: pytest.fail(
+        "redirected output must be rejected before database access"
+    ))
+
+    assert bootstrap_cli.main(["create"]) == 1
+    _assert_generic_failure(capsys)
+
+
 def _settings(configured_pepper: str | None = HMAC_PEPPER) -> SimpleNamespace:
     pepper_value = (
         None if configured_pepper is None else SecretStr(configured_pepper)
@@ -81,6 +101,7 @@ def _assert_generic_failure(
 def test_create_prints_plaintext_once_only_after_commit(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     engine = _TransactionEngine()
     inserted: list[BootstrapRecord] = []
@@ -115,6 +136,8 @@ def test_create_prints_plaintext_once_only_after_commit(
     assert exit_code == 0
     assert captured.err == ""
     assert len(wire_values) == 1
+    assert wire_values[0] not in caplog.text
+    assert HMAC_PEPPER not in caplog.text
     assert events[0] == "commit"
     assert events.index("commit") < events.index("print")
     assert "Bootstrap created" in captured.out
@@ -300,7 +323,8 @@ def test_unknown_revoke_failure_is_generic(
     assert engine.disposed
 
 
-def test_installed_console_failure_redacts_environment_and_arguments() -> None:
+@pytest.mark.parametrize("command", ("create", "revoke"))
+def test_installed_console_failure_redacts_environment_and_arguments(command: str) -> None:
     executable_name = "device-watch-bootstrap.exe" if os.name == "nt" else "device-watch-bootstrap"
     executable_path = Path(sys.executable).with_name(executable_name)
     environment: dict[str, str] = dict(os.environ)
@@ -312,6 +336,7 @@ def test_installed_console_failure_redacts_environment_and_arguments() -> None:
     label_value = "subprocess-private-label"
     environment.update(
         {
+            "PYTHONDONTWRITEBYTECODE": "1",
             "DEVICE_WATCH_ENV": "test",
             "DATABASE_URL": database_value,
             "DEVICE_WATCH_BOOTSTRAP_HMAC_PEPPER": pepper_value,
@@ -319,7 +344,10 @@ def test_installed_console_failure_redacts_environment_and_arguments() -> None:
     )
 
     completed = subprocess.run(
-        [str(executable_path), "create", "--label", label_value],
+        [str(executable_path), command, *(
+            ["--label", label_value] if command == "create"
+            else [str(FIXED_BOOTSTRAP_ID)]
+        )],
         cwd=Path(__file__).resolve().parents[3],
         env=environment,
         capture_output=True,

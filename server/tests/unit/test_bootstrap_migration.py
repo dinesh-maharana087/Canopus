@@ -51,3 +51,17 @@ def test_bootstrap_revision_creates_secret_safe_enrollment_storage(
     assert "device_id" not in bootstrap_sql
     assert "credential" not in bootstrap_sql
     assert "lifecycle" not in bootstrap_sql
+
+
+def test_bootstrap_downgrade_removes_only_bootstrap_storage(monkeypatch, capsys) -> None:
+    monkeypatch.setenv("DEVICE_WATCH_ENV", "test")
+    monkeypatch.setenv("DATABASE_URL", "mysql+pymysql://db/device_watch")
+    config = Config("server/alembic.ini")
+
+    command.downgrade(config, "20260908_0003:20260908_0002", sql=True)
+
+    output = capsys.readouterr().out.lower()
+    assert "drop table enrollment_bootstraps" in output
+    assert "drop table devices" not in output
+    assert output.count("drop table") == 1
+    assert "20260908_0002" in output

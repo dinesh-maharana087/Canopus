@@ -44,7 +44,9 @@ class Settings(BaseSettings):
     device_watch_env: Environment = Field(validation_alias="DEVICE_WATCH_ENV")
     database_url: SecretStr = Field(validation_alias="DATABASE_URL")
     device_watch_enable_docs: bool = False
-    device_watch_bootstrap_hmac_pepper: SecretStr | None = None
+    device_watch_bootstrap_hmac_pepper: SecretStr | None = Field(
+        default=None, validation_alias="DEVICE_WATCH_BOOTSTRAP_HMAC_PEPPER"
+    )
 
     @field_validator("device_watch_bootstrap_hmac_pepper")
     @classmethod

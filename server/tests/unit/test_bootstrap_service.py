@@ -4,14 +4,14 @@ from collections.abc import Generator
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta, timezone
 from typing import cast
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 from uuid import UUID
 
 import pytest
 from pydantic import SecretStr, ValidationError
 from sqlalchemy.engine import Connection
 
-from device_watch_server.core.config import Environment, Settings
+from device_watch_server.core.config import Environment, Settings, load_settings
 from device_watch_server.enrollment import service
 from device_watch_server.enrollment.bootstrap import (
     DIGEST_VERSION,
@@ -124,6 +124,34 @@ def test_bootstrap_pepper_setting_is_optional_and_secret_safe() -> None:
     assert isinstance(configured.device_watch_bootstrap_hmac_pepper, SecretStr)
     assert HMAC_PEPPER not in repr(configured)
     assert HMAC_PEPPER not in str(configured)
+
+
+def test_bootstrap_pepper_loads_from_protected_uppercase_environment() -> None:
+    with patch("os.environ", {
+        "DEVICE_WATCH_ENV": "test",
+        "DATABASE_URL": DATABASE_URL,
+        "DEVICE_WATCH_BOOTSTRAP_HMAC_PEPPER": HMAC_PEPPER,
+    }):
+        settings = load_settings()
+
+    pepper = settings.device_watch_bootstrap_hmac_pepper
+    assert pepper is not None
+    assert pepper.get_secret_value() == HMAC_PEPPER
+    assert HMAC_PEPPER not in repr(settings)
+
+
+def test_provisioning_expiry_matches_mysql_second_precision(
+    connection: Connection, repository: _RepositoryDouble
+) -> None:
+    issued = provision_bootstrap(
+        connection, HMAC_PEPPER, clock=lambda: NOW.replace(microsecond=987654)
+    )
+
+    assert issued.created_at == NOW
+    assert issued.expires_at == NOW + timedelta(minutes=15)
+    record = repository.records[issued.bootstrap_id]
+    assert record.created_at == issued.created_at
+    assert record.expires_at == issued.expires_at
 
 
 @pytest.mark.parametrize("configured_value", ("p" * 31, "\u20ac" * 10))

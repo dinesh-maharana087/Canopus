@@ -559,3 +559,137 @@ Verification executed:
 Adjacent regression repair: `setup_logging()` now re-enables the existing server logger and safely replaces stale stdout handlers so the completed Step 06 logging test remains stable across repeated app construction and pytest capture. Its JSON/redaction contract is unchanged; the full server unit suite passes.
 
 The next permitted work is Step 03 only. Step 03 has not been started.
+
+## Stage 2 Step 03 Implementation — 2026-09-13
+
+Status: **Implementation complete; full definition-of-done verification BLOCKED BY ENVIRONMENT**.
+
+This entry supersedes the preceding historical statement that Step 03 had not
+started. At session start, HEAD `8d91261` had a clean working tree and already
+contained bootstrap cryptography, repository/service code, revision
+`20260908_0003`, and unit tests. Those valid implementations were preserved.
+The [Stage 1 baseline](../verification/stage-01/stage-01-baseline.md) remains the
+foundation; no historical Stage 1 verification evidence was changed.
+
+Completed only Step 03:
+
+- Added the local `device-watch-bootstrap` command with `create` and `revoke`
+  operations. Creation requires terminal stdout and emits plaintext once, only
+  after commit. It refuses redirected output and accepts no secret arguments.
+  Configuration, parser, database, commit, and invalid-state errors use the
+  generic `Bootstrap operation failed` diagnostic without exception details.
+- Bound `DEVICE_WATCH_BOOTSTRAP_HMAC_PEPPER` to the existing secret-safe setting
+  in case-sensitive environments. MySQL/PyMySQL validation, production TLS
+  policy, engine construction, health routes, and deployment remain unchanged.
+- Aligned service timestamps with the existing MySQL whole-second `DATETIME`
+  representation so returned/displayed expiration matches stored expiration.
+- Added generation uniqueness, offline downgrade, environment-binding, timestamp,
+  terminal-output, log-safety, and subprocess regression coverage. The existing
+  missing bootstrap CLI was a direct Step 03 dependency and is now implemented.
+- Added eight real-MySQL cases for schema reversal, durable digest/timestamps,
+  unique fingerprint enforcement, expiry/revocation/consumption, rollback, and
+  concurrent single use. Pinned the existing Step 02 integration test to
+  revision `20260908_0002` so its unchanged assertions do not target the newer head.
+
+Files created or modified in this session:
+
+- `server/pyproject.toml`
+- `server/src/device_watch_server/core/config.py`
+- `server/src/device_watch_server/enrollment/cli.py`
+- `server/src/device_watch_server/enrollment/service.py`
+- `server/tests/unit/test_bootstrap_cli.py`
+- `server/tests/unit/test_bootstrap_service.py`
+- `server/tests/unit/test_bootstrap_primitives.py`
+- `server/tests/unit/test_bootstrap_migration.py`
+- `server/tests/integration/test_bootstrap_persistence.py`
+- `server/tests/integration/test_device_identity_migration.py`
+- `docs/progress/current-status.md`
+
+Provisioning and persistence handoff:
+
+- Provision with `device-watch-bootstrap create --expires-in-minutes 15 --label rack-a`;
+  revoke with `device-watch-bootstrap revoke <bootstrap-id>`. The ID and label
+  are audit metadata, not secrets. There is no show/reprint, consume CLI, or
+  public bootstrap-management route.
+- Supply `DEVICE_WATCH_ENV`, `DATABASE_URL`, and
+  `DEVICE_WATCH_BOOTSTRAP_HMAC_PEPPER` through protected operator configuration
+  or secret-manager injection. The pepper must contain at least 32 UTF-8 bytes;
+  operators must generate it randomly and restrict access to the provisioning
+  account and configuration. No pepper value belongs in command arguments,
+  URLs, shell history, logs, or labels. Revocation by ID needs no pepper.
+- Use a trusted terminal without session recording or output capture. Transfer
+  the initially displayed bootstrap through a protected out-of-band workflow.
+  If delivery fails after commit, revoke its ID if available or let it expire;
+  a retry creates new material and cannot recover the previous plaintext.
+- Wire format is `dwb_v1_` followed by 43 unpadded base64url characters encoding
+  32 cryptographically random bytes. Stored `digest_version` is
+  `hmac-sha256-v1`; `digest` is 32-byte HMAC-SHA-256 over the domain tag
+  `device-watch/bootstrap-digest/v1` plus a NUL byte and the random payload.
+  The unique 32-byte SHA-256 lookup fingerprint uses the separate domain tag
+  `device-watch/bootstrap-fingerprint/v1` plus NUL and payload. Only the HMAC
+  verifies authorization. The pepper and plaintext are never persisted in rows.
+- Default expiration is 15 minutes; overrides are positive integer minutes,
+  with unrepresentable dates rejected. All bootstrap service timestamps are
+  server-owned UTC seconds. Labels are optional, trimmed, and at most 120
+  characters. Changing the pepper deliberately invalidates outstanding values.
+- Available records must be unexpired, unconsumed, and unrevoked. Exact expiry
+  is invalid; consumed/revoked states are terminal. Lookup locks the row before
+  validation and a guarded transition. Repository and service functions never
+  commit; the caller owns the transaction. Step 05 must compose bootstrap
+  consumption and device creation in that same transaction when authorized.
+- Preserved migration chain: `20260831_0001 -> 20260908_0002 -> 20260908_0003`.
+  Revision 0003 creates only `enrollment_bootstraps`, with a UUID primary key,
+  unique fingerprint, digest/version, label, four lifecycle timestamps, and
+  expiry/terminal-state constraints. Its downgrade removes only that table.
+
+Verification executed with the existing `server/.venv/Scripts/python.exe -B`
+and host interpreter access (the sandbox could not access the base interpreter).
+The local console entry point was registered offline using cached build
+dependencies; no runtime dependencies or lockfile changed.
+
+| Check | Result |
+| --- | --- |
+| Focused bootstrap unit tests plus directly affected settings/engine and Step 01/02 checks | **PASS** — 91 tests (67 bootstrap, 24 boundary/prerequisite), exit 0 |
+| Server Ruff, sources/migrations/tests | **PASS** — exit 0 |
+| Strict mypy on bootstrap sources, changed config, central engine, and new integration test | **PASS** — 8 files, exit 0 |
+| Strict mypy on all server sources | **FAIL, pre-existing and outside Step 03** — only `core/logging.py:127`, missing `StreamHandler` type argument; 22 files checked |
+| Real-MySQL bootstrap and affected Step 02 integration checks | **BLOCKED BY ENVIRONMENT** — 9 skipped (8 bootstrap, 1 identity); no `DATABASE_URL`, Docker, or MySQL runtime available |
+| Focused independent security review | No blocking implementation defect found; subprocess configuration-redaction coverage gap corrected |
+| Git handoff checks | **PASS** — status/diff reviewed and `git diff --check` clean |
+
+Exact final check commands, run from the repository root:
+
+```powershell
+& server/.venv/Scripts/python.exe -B -m pytest server/tests/unit/test_bootstrap_cli.py server/tests/unit/test_bootstrap_service.py server/tests/unit/test_bootstrap_repository.py server/tests/unit/test_bootstrap_primitives.py server/tests/unit/test_bootstrap_migration.py server/tests/unit/test_config.py server/tests/unit/test_engine_tls.py server/tests/unit/test_device_identity_migration.py server/tests/unit/test_stage2_domain_contracts.py -q --tb=short
+& server/.venv/Scripts/python.exe -B -m ruff check server/src server/alembic server/tests
+& server/.venv/Scripts/python.exe -B -m mypy --config-file server/pyproject.toml server/src
+& server/.venv/Scripts/python.exe -B -m mypy --config-file server/pyproject.toml server/src/device_watch_server/enrollment server/src/device_watch_server/core/config.py server/src/device_watch_server/db/engine.py server/tests/integration/test_bootstrap_persistence.py
+& server/.venv/Scripts/python.exe -B -m pytest server/tests/integration/test_bootstrap_persistence.py server/tests/integration/test_device_identity_migration.py -q -rs --tb=short
+git status --short
+git diff --stat
+git diff --check
+```
+
+The new MySQL module requires a dedicated disposable MySQL 8.x database and
+`DEVICE_WATCH_ENV=test`. It rejects unknown schema objects/revisions before
+migration, recreates only bootstrap storage, preserves device rows, and leaves
+revision 0003 installed. Run it serially; do not point it at an application database.
+Blocked runtime checks were not retried or represented as PASS. A standalone
+mypy invocation for the new test initially could not discover typed local
+sources; checking the test together with those sources passed without ignores.
+
+The unrelated logging typing defect was not repaired. Tracked Python bytecode
+rewritten by a subprocess check was restored byte-for-byte to its clean starting
+state; subprocess tests now disable bytecode writes. No commit or branch change
+was made. An unexpected, unrelated `.gitignore` trailing-whitespace/newline change
+appeared during final checks; it was inspected and left untouched.
+
+Step 03's requested implementation and available focused checks are complete,
+but real-MySQL persistence and concurrency have not executed successfully here.
+Full definition-of-done verification is therefore not confirmed; its master-index
+row remains **Pending**, as requested. The next numbered step permitted on a new
+explicit instruction is **Step 04 — Credential hashing and verification primitives**
+(it depends on Step 01). Step 03 runtime re-verification remains outstanding;
+Step 05 must not treat its blocked persistence evidence as PASS.
+No Step 04, device credentials, enrollment/device-creation service or API, agent,
+heartbeat, connectivity, metrics, or frontend behavior was implemented.

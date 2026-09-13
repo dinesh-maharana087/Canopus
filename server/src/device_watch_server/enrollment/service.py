@@ -21,10 +21,14 @@ from device_watch_server.enrollment.bootstrap import (
 )
 from device_watch_server.enrollment.repository import (
     BootstrapRecord,
-    consume_bootstrap as mark_bootstrap_consumed,
     insert_bootstrap,
     lookup_bootstrap_by_fingerprint,
     lookup_bootstrap_by_id,
+)
+from device_watch_server.enrollment.repository import (
+    consume_bootstrap as mark_bootstrap_consumed,
+)
+from device_watch_server.enrollment.repository import (
     revoke_bootstrap as mark_bootstrap_revoked,
 )
 
@@ -80,7 +84,8 @@ def _server_utc(clock: Clock) -> datetime:
         raise _failure()
     if current.tzinfo is None or current.utcoffset() is None:
         raise _failure()
-    return current.astimezone(UTC)
+    # MySQL DATETIME in the approved bootstrap migration stores whole seconds.
+    return current.astimezone(UTC).replace(microsecond=0)
 
 
 def _require_hmac_pepper(configured_pepper: str | None) -> str:

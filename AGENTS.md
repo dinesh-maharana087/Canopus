@@ -22,13 +22,13 @@ If an architectural change appears necessary, explain the conflict and keep the 
 
 ---
 
-## Source-of-truth priority
+### Source-of-truth priority
 
 When project documents disagree, use this priority:
 
 1. Explicit current user request
 2. Approved stage design/specification
-3. Approved execution/repair plan for the requested task
+3. Approved execution card, repair plan/card, or verification card for the requested task
 4. Independent verification/baseline evidence
 5. Current implementation and tests
 6. Progress/status documents
@@ -65,13 +65,104 @@ Do not implement functionality from a later stage merely because it is convenien
 
 ## Token and context efficiency
 
+The repository documents are the persistent project context.
+
+When the relevant specification, stage baseline, master index, execution card, repair card, or verification evidence already exists, the user does NOT need to repeat that information in the prompt.
+
+Short task prompts are expected and preferred.
+
+Examples:
+
+```text
+Execute Stage 2 Step 01 only.
+```
+
+```text
+Execute S2-03 only.
+```
+
+```text
+Repair R2 only.
+```
+
+```text
+Re-verify V01 only.
+```
+
+Treat the short task identifier plus the repository documentation as the complete working instruction.
+
+For a short task prompt:
+
+1. Identify the requested stage, step, repair batch, or verification area.
+2. Locate its entry in the relevant master index when one exists.
+3. Read the referenced execution/repair/verification card.
+4. Read only the specification sections, baseline evidence, dependencies, and source files referenced by that card.
+5. Inspect the current implementation needed for that scope.
+6. Execute only the requested task.
+7. Stop after verification and reporting.
+
+Do not ask the user to paste requirements already recorded in repository documentation.
+
+Do not require the user to restate:
+
+* architecture already captured in an approved specification
+* acceptance criteria already captured in an execution card
+* Stage 1 baseline results already captured in verification evidence
+* file boundaries already captured in a task card
+* dependencies already captured in the master index
+* verification commands already captured in the execution or verification card
+
+The master index and execution cards are navigation documents. Use them to find the minimum context required for the requested task.
+
+Do not automatically read every stage document just because it exists.
+
+For Stage 2 and later work, do not re-read the complete Stage 1 specification or verification set unless:
+
+* the requested task directly depends on a Stage 1 contract
+* the execution card explicitly references it
+* a changed file invalidates relevant Stage 1 evidence
+* a contradiction is discovered
+* the user explicitly requests a broader review
+
+When Stage 1 baseline evidence is needed, read the consolidated baseline first and open detailed V-area evidence only when relevant to the requested dependency.
+
+Prefer this context path:
+
+```text
+short user prompt
+    ↓
+master index
+    ↓
+execution / repair / verification card
+    ↓
+referenced specification or baseline sections
+    ↓
+affected implementation
+```
+
+Avoid this context path:
+
+```text
+short user prompt
+    ↓
+entire repository
+    ↓
+all specifications
+    ↓
+all plans
+    ↓
+all verification evidence
+    ↓
+reconstruct project history
+```
+
 Keep the main Codex thread focused on:
 
-- requirements
-- implementation decisions
-- important defects
-- verification results
-- handoff state
+* requirements that are not already documented
+* implementation decisions
+* important defects
+* verification results
+* handoff state
 
 Do not paste large logs into the main conversation.
 
@@ -79,18 +170,22 @@ Prefer quiet/concise command options.
 
 When command output is large:
 
-- save full output to a temporary file if needed
-- inspect only relevant sections
-- summarize results
-- include only actionable errors
+* save full output to a temporary file if needed
+* inspect only relevant sections
+* summarize results
+* include only actionable errors
 
-Do not repeatedly re-read large specification or plan files unless necessary.
+Do not repeatedly re-read large specification, plan, baseline, or execution-card files unless necessary.
 
 Do not repeatedly summarize the entire repository.
 
 Do not scan unrelated project areas when the requested task already provides a focused file boundary.
 
-Prefer existing verification evidence and execution cards over reconstructing old context from scratch.
+Prefer existing verification evidence, baselines, master indexes, and execution cards over reconstructing old context from scratch.
+
+If sufficient repository context exists to execute a short prompt safely, begin the requested task without asking the user to provide a larger prompt.
+
+A short prompt never overrides scope-control, architecture, security, verification, or completion rules in this file.
 
 ---
 
@@ -101,17 +196,19 @@ A task may be interrupted by model/session limits.
 When resuming an interrupted task:
 
 1. Do not restart the task from scratch.
-2. Read the relevant execution/repair/verification plan.
-3. Read the latest progress or evidence document.
+2. Read the relevant execution/repair/verification card or plan.
+3. Read the latest progress, baseline, or evidence document relevant to that task.
 4. Inspect:
-   - `git status`
-   - `git diff --stat`
-   - `git diff`
+
+   * `git status`
+   * `git diff --stat`
+   * `git diff`
 5. Identify:
-   - work already completed
-   - partially implemented work
-   - unverified work
-   - missing work
+
+   * work already completed
+   * partially implemented work
+   * unverified work
+   * missing work
 6. Preserve correct uncommitted changes.
 7. Continue only the unfinished portion of the same task.
 8. Run the complete verification required for that task before declaring it complete.
@@ -145,6 +242,22 @@ Prefer at most 1-3 focused subagents for a task.
 The main agent owns the final implementation decision.
 
 Subagents should normally inspect/review rather than independently edit the same files.
+
+---
+
+### Additional rule for Token and context efficiency
+
+If the master index or execution/repair/verification card already identifies the relevant source files, tests, specification sections, or verification evidence, use that as the initial inspection boundary.
+
+Do not perform a repository-wide search merely to rediscover information already provided by the task card.
+
+Expand beyond that boundary only when:
+
+* a required dependency cannot be resolved
+* the referenced implementation has moved or no longer exists
+* a test failure points outside the documented boundary
+* a contract conflict is discovered
+* broader inspection is explicitly required by the task
 
 ---
 

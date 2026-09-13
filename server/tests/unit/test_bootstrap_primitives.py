@@ -47,6 +47,13 @@ def test_parser_rejects_malformed_or_wrong_length_values(wire_value: str) -> Non
     assert wire_value not in str(error.value)
 
 
+def test_generation_produces_distinct_values_and_lookup_fingerprints() -> None:
+    values = [generate_bootstrap_value() for _ in range(64)]
+
+    assert len({value.payload for value in values}) == 64
+    assert len({bootstrap_fingerprint(value) for value in values}) == 64
+
+
 def test_fingerprint_and_digest_are_separate_32_byte_versioned_values() -> None:
     value = BootstrapValue.parse("dwb_v1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
 

@@ -18,6 +18,7 @@ dependencies = [
 
 [project.scripts]
 device-watch-db-check = "device_watch_server.cli:main"
+device-watch-bootstrap = "device_watch_server.enrollment.cli:main"
 
 [dependency-groups]
 test = [

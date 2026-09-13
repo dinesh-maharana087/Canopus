@@ -29,7 +29,7 @@ def test_device_identity_migration_is_reversible_and_constrained() -> None:
     alembic_cfg = Config("server/alembic.ini")
 
     command.downgrade(alembic_cfg, "base")
-    command.upgrade(alembic_cfg, "head")
+    command.upgrade(alembic_cfg, "20260908_0002")
 
     with engine.begin() as connection:
         current = connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
@@ -82,4 +82,4 @@ def test_device_identity_migration_is_reversible_and_constrained() -> None:
     with engine.connect() as connection:
         assert inspect(connection).get_table_names() == ["alembic_version"]
 
-    command.upgrade(alembic_cfg, "head")
+    command.upgrade(alembic_cfg, "20260908_0002")
