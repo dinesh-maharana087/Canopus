@@ -28,7 +28,7 @@ def test_bootstrap_revision_creates_secret_safe_enrollment_storage(
     assert revision.down_revision == "20260908_0002"
     assert Base.metadata.tables == {}
 
-    command.upgrade(config, "head", sql=True)
+    command.upgrade(config, "20260908_0003", sql=True)
     output = capsys.readouterr().out.lower()
     bootstrap_sql = output.split("create table enrollment_bootstraps", maxsplit=1)[1]
 

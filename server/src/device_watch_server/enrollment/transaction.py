@@ -44,14 +44,22 @@ def _utc_now() -> datetime:
 
 def _creation_time(clock: Clock) -> datetime:
     value = clock()
-    if not isinstance(value, datetime) or value.tzinfo is None or value.utcoffset() is None:
+    if (
+        not isinstance(value, datetime)
+        or value.tzinfo is None
+        or value.utcoffset() is None
+    ):
         raise EnrollmentError()
     return value.astimezone(UTC).replace(microsecond=0)
 
 
 def enroll_device(
-    engine: Engine, bootstrap_secret: str, configured_pepper: str | None,
-    *, display_name: str, clock: Clock = _utc_now,
+    engine: Engine,
+    bootstrap_secret: str,
+    configured_pepper: str | None,
+    *,
+    display_name: str,
+    clock: Clock = _utc_now,
 ) -> EnrollmentResult:
     """Consume bootstrap and insert identity/hash on one connection, then deliver.
 
@@ -63,11 +71,16 @@ def enroll_device(
         with engine.begin() as connection:
             # Pass the live clock: bootstrap validation samples it AFTER row locking.
             validate_and_consume_bootstrap(
-                connection, bootstrap_secret, configured_pepper, clock=clock,
+                connection,
+                bootstrap_secret,
+                configured_pepper,
+                clock=clock,
             )
             created_at = _creation_time(clock)
             device = DeviceIdentity(
-                device_id=uuid4(), display_name=display_name, created_at=created_at,
+                device_id=uuid4(),
+                display_name=display_name,
+                created_at=created_at,
             )
             insert_device(connection, device)
             issued = issue_credential(clock=lambda: created_at)

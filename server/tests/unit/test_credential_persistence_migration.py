@@ -10,7 +10,8 @@ from alembic import command
 
 
 def test_credential_schema_extends_bootstrap_head_without_plaintext(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     monkeypatch.setenv("DEVICE_WATCH_ENV", "test")
     monkeypatch.setenv("DATABASE_URL", "mysql+pymysql://db/device_watch")
@@ -33,16 +34,25 @@ def test_credential_schema_extends_bootstrap_head_without_plaintext(
         assert f"{name} datetime" in output
     assert "engine=innodb" in output
     assert "unique (device_id)" not in output
-    for excluded in ("bootstrap_secret", "credential_value", "heartbeat", "connectivity", "metrics"):
+    for excluded in (
+        "bootstrap_secret",
+        "credential_value",
+        "heartbeat",
+        "connectivity",
+        "metrics",
+    ):
         assert excluded not in output
 
 
 def test_credential_downgrade_preserves_prerequisite_tables(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     monkeypatch.setenv("DEVICE_WATCH_ENV", "test")
     monkeypatch.setenv("DATABASE_URL", "mysql+pymysql://db/device_watch")
-    command.downgrade(Config("server/alembic.ini"), "20260913_0004:20260908_0003", sql=True)
+    command.downgrade(
+        Config("server/alembic.ini"), "20260913_0004:20260908_0003", sql=True
+    )
     output = capsys.readouterr().out.lower()
     assert "drop table device_credentials" in output
     assert output.count("drop table") == 1

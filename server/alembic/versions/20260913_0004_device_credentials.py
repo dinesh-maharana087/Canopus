@@ -28,8 +28,10 @@ def upgrade() -> None:
         sa.Column("replaced_at", sa.DateTime(), nullable=True),
         sa.PrimaryKeyConstraint("key_id", name="pk_device_credentials"),
         sa.ForeignKeyConstraint(
-            ["device_id"], ["devices.device_id"],
-            name="fk_device_credentials_device_id_devices", ondelete="RESTRICT",
+            ["device_id"],
+            ["devices.device_id"],
+            name="fk_device_credentials_device_id_devices",
+            ondelete="RESTRICT",
         ),
         sa.CheckConstraint(
             "last_used_at IS NULL OR last_used_at >= created_at",
@@ -45,7 +47,9 @@ def upgrade() -> None:
         ),
         mysql_engine="InnoDB",
     )
-    op.create_index("ix_device_credentials_device_id", "device_credentials", ["device_id"])
+    op.create_index(
+        "ix_device_credentials_device_id", "device_credentials", ["device_id"]
+    )
 
 
 def downgrade() -> None:

@@ -20,12 +20,6 @@ from uuid import uuid4
 import pytest
 from alembic.config import Config
 from alembic.util.exc import CommandError
-from device_watch_server.enrollment.persistence import credentials_table, devices_table
-from device_watch_server.enrollment.transaction import (
-    EnrollmentError,
-    EnrollmentResult,
-    enroll_device,
-)
 from sqlalchemy import event, inspect, select, text
 from sqlalchemy.engine import Connection, Engine
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
@@ -35,8 +29,14 @@ from device_watch_server.auth.credentials import CredentialRecord, verify_creden
 from device_watch_server.core.config import Environment, load_settings
 from device_watch_server.db.engine import create_database_engine
 from device_watch_server.enrollment import transaction
+from device_watch_server.enrollment.persistence import credentials_table, devices_table
 from device_watch_server.enrollment.repository import bootstrap_table
 from device_watch_server.enrollment.service import provision_bootstrap
+from device_watch_server.enrollment.transaction import (
+    EnrollmentError,
+    EnrollmentResult,
+    enroll_device,
+)
 
 pytestmark = pytest.mark.integration
 BOOTSTRAP_REVISION = "20260908_0003"
@@ -184,7 +184,7 @@ def _enroll(
 
 def _counts(engine: Engine) -> tuple[int, int, int]:
     with _safe_database_errors(), engine.connect() as connection:
-        return tuple(
+        devices, credentials, consumed = (
             int(connection.execute(text(query)).scalar_one())
             for query in (
                 "SELECT COUNT(*) FROM devices",
@@ -192,6 +192,7 @@ def _counts(engine: Engine) -> tuple[int, int, int]:
                 "SELECT COUNT(*) FROM enrollment_bootstraps WHERE consumed_at IS NOT NULL",
             )
         )
+        return devices, credentials, consumed
 
 
 def test_enrollment_commits_hash_only_and_rejects_credential_replay(
@@ -280,7 +281,7 @@ def test_insert_failure_rolls_back_all_enrollment_effects(
     bootstrap = _bootstrap(engine)
     original = getattr(transaction, failure_point)
 
-    def fail_after_insert(*args, **kwargs) -> None:
+    def fail_after_insert(*args: object, **kwargs: object) -> None:
         original(*args, **kwargs)
         raise RuntimeError("injected enrollment insert failure")
 
@@ -301,7 +302,14 @@ def test_bootstrap_expiring_while_waiting_for_lock_is_rejected(
     selecting = Event()
     current = [NOW + timedelta(seconds=59)]
 
-    def observe_select(connection, cursor, statement, parameters, context, executemany):
+    def observe_select(
+        connection: Connection,
+        cursor: object,
+        statement: str,
+        parameters: object,
+        context: object,
+        executemany: bool,
+    ) -> None:
         if "enrollment_bootstraps" in statement and "FOR UPDATE" in statement.upper():
             selecting.set()
 
@@ -388,7 +396,7 @@ def test_credential_migration_round_trip_and_database_constraints(
     result = _enroll(engine, _bootstrap(engine))
     with _safe_database_errors(), engine.begin() as connection:
         values = dict(connection.execute(select(credentials_table)).mappings().one())
-        invalid_changes = (
+        invalid_changes: tuple[dict[str, object], ...] = (
             {},
             {"key_id": uuid4().hex, "device_id": str(uuid4())},
             {"key_id": uuid4().hex, "revoked_at": NOW - timedelta(seconds=1)},

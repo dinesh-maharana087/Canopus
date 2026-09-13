@@ -85,7 +85,7 @@ Health-only Stage 1 routes remain available; the existing app factory/lifespan r
 
 ## Current Handoff
 
-[Step 04](04-credential-primitives.md) is complete: isolated Argon2id credential generation, verification, revocation, and rotation primitives pass focused checks. [Step 03](03-bootstrap-provisioning.md) implementation exists but its real-MySQL verification remains blocked; its Pending status is unchanged. See the [current progress record](../../../progress/current-status.md) for both evidence boundaries. Step 05 remains unstarted and requires an explicit request and prerequisite review.
+[Step 05](05-enrollment-service.md) implementation exists: one transaction consumes the locked bootstrap and inserts a device plus its credential hash, returning the transient credential only after commit. Focused unit, offline migration, Ruff, and strict mypy checks pass. Its required real-MySQL concurrency, rollback, and migration checks are **BLOCKED BY ENVIRONMENT**, so Step 05 remains Pending and its full definition of done is not yet verified. [Step 03](03-bootstrap-provisioning.md) retains its MySQL verification block and Pending status; [Step 04](04-credential-primitives.md) remains Complete. See the [current progress record](../../../progress/current-status.md) for commands, evidence, and transaction/retry contracts. Complete the outstanding MySQL verification before treating these persistence contracts as proved. Step 06 has not started and requires a separate explicit request.
 
 ## Planning Boundary
 

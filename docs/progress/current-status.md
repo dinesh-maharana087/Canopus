@@ -794,3 +794,132 @@ Step 04 is marked Complete in the master index; Step 03 remains Pending.
 Step 05 was not started. It requires a new explicit instruction and review of
 its prerequisites, including the outstanding Step 03 persistence evidence.
 No commit or branch change was made.
+
+## Stage 2 Step 05 Implementation — 2026-09-13
+
+Status: **Implementation present; required MySQL verification BLOCKED BY
+ENVIRONMENT. Step 05 remains Pending; its full definition of done is not yet
+verified.** No known implementation FAIL remains within this step.
+
+Executed only the enrollment-transaction card. The session began at `e0b78f8`
+and resumed from the user's `0ce8af2` WIP commit with a clean working tree.
+Existing Step 01–04 work and the committed Step 05 implementation were
+preserved. The preceding Step 04 handoff is historical. Step 03's outstanding
+MySQL checks remain blocked; Step 04 remains Complete. The consolidated Stage 1
+baseline and historical verification evidence were reused without modification
+or a full re-audit of unchanged components.
+
+Implementation and handoff contracts:
+
+- `enrollment.transaction.enroll_device(engine, bootstrap_secret,
+  configured_pepper, *, display_name, clock)` uses one `engine.begin()`
+  connection for bootstrap consumption, UUIDv4 device insertion, and credential
+  insertion. It composes the existing Step 03 HMAC/pepper validation and Step 04
+  Argon2id issuance primitives without changing them.
+- The existing bootstrap lookup performs `SELECT ... FOR UPDATE` followed by
+  lifecycle validation and a guarded consume update. The live server clock is
+  passed through so expiry is evaluated after obtaining the lock. The lock is
+  held until the complete transaction commits or rolls back. No isolation-level
+  override is introduced: the central MySQL engine retains the database's
+  configured transactional isolation. **All three participating tables must use
+  InnoDB**, which the MySQL fixture checks. No autocommit or SQLite alternative
+  is introduced.
+- Device creation and credential creation share an aware UTC timestamp rounded
+  to whole seconds, matching existing MySQL `DATETIME` precision. Persistence
+  explicitly converts to naive UTC; returned identity metadata remains aware
+  UTC. The existing display-name and UUIDv4 contracts remain authoritative.
+- `enrollment.persistence` exposes insert-only helpers that use the supplied
+  connection and never commit independently. Only the public credential ID,
+  device foreign key, Argon2id hash, and lifecycle timestamps are persisted.
+  Bootstrap plaintext, device credential plaintext, and the pepper are never
+  passed to these inserts.
+- `EnrollmentResult` contains only device metadata and the transient
+  `CredentialValue`; its repr/string output is redacted. The service returns
+  it only after successful commit. No result contains a hash or bootstrap, and
+  there is no stored plaintext from which to reconstruct a replay response.
+- Error taxonomy: invalid bootstrap states, invalid identity values, issuance
+  failures, and expected connection/storage/commit failures map to the single
+  opaque `EnrollmentError("Enrollment failed")` with suppressed exception
+  context. The service emits no logs. Transaction-body failures roll back all
+  three effects. A commit exception returns no success; if the server committed
+  before a connection failed, the outcome may be uncertain to the caller.
+  There is no automatic retry or credential replay. Confirmed rollback leaves
+  the bootstrap reusable while valid; uncertain commit or lost delivery needs
+  operator recovery, never retrieval of the old credential.
+
+The prerequisite schema contained no credential persistence. The minimal
+Alembic extension required for this step is `20260913_0004`, following
+`20260831_0001 -> 20260908_0002 -> 20260908_0003`. It creates only
+`device_credentials`: a 32-character public key primary key, 36-character device
+foreign key with restricted deletion, 97-character encoded hash, and
+created/last-used/revoked/replaced timestamps. A nonunique device index permits
+future credential replacement without implementing rotation here. Checks
+reject use/revocation before creation and require replacement to coincide with
+revocation. The new table explicitly uses InnoDB. Downgrade drops only this
+table; earlier migrations are unchanged. The Step 03 offline migration test
+now targets its own revision instead of the moving `head`, preserving its
+original bootstrap-only assertions.
+
+Files created or modified across the Step 05 session and continuation:
+
+- `server/src/device_watch_server/enrollment/transaction.py`
+- `server/src/device_watch_server/enrollment/persistence.py`
+- `server/alembic/versions/20260913_0004_device_credentials.py`
+- `server/tests/unit/test_enrollment_transaction.py`
+- `server/tests/unit/test_credential_persistence_migration.py`
+- `server/tests/unit/test_bootstrap_migration.py`
+- `server/tests/integration/test_enrollment_transaction_mysql.py` (renamed from
+  the WIP `test_enrollment_transaction.py` to avoid colliding with the unit module)
+- `docs/progress/current-status.md`
+- `docs/superpowers/plans/2026-09-08-device-watch-stage-2/00-master-index.md`
+
+Verification commands, run from the repository root using the existing
+`server/.venv/Scripts/python.exe` with host access and `-B`:
+
+```powershell
+& server/.venv/Scripts/python.exe -B -m pytest server/tests/unit/test_enrollment_transaction.py server/tests/unit/test_credential_persistence_migration.py server/tests/unit/test_bootstrap_migration.py server/tests/unit/test_bootstrap_service.py server/tests/unit/test_bootstrap_repository.py server/tests/unit/test_bootstrap_primitives.py server/tests/unit/test_credential_primitives.py server/tests/unit/test_stage2_domain_contracts.py server/tests/unit/test_device_identity_migration.py -q --tb=short
+& server/.venv/Scripts/python.exe -B -m pytest server/tests/unit/test_enrollment_transaction.py server/tests/integration/test_enrollment_transaction_mysql.py -q --tb=short -rs
+& server/.venv/Scripts/python.exe -B -m ruff check server/src/device_watch_server/enrollment/transaction.py server/src/device_watch_server/enrollment/persistence.py server/alembic/versions/20260913_0004_device_credentials.py server/tests/unit/test_enrollment_transaction.py server/tests/unit/test_credential_persistence_migration.py server/tests/unit/test_bootstrap_migration.py server/tests/integration/test_enrollment_transaction_mysql.py
+& server/.venv/Scripts/python.exe -B -m mypy --config-file server/pyproject.toml server/src/device_watch_server/enrollment/transaction.py server/src/device_watch_server/enrollment/persistence.py server/alembic/versions/20260913_0004_device_credentials.py server/tests/unit/test_enrollment_transaction.py server/tests/unit/test_credential_persistence_migration.py server/tests/integration/test_enrollment_transaction_mysql.py
+```
+
+| Check | Result |
+| --- | --- |
+| Focused unit, prerequisite, and offline MySQL-dialect migration tests | **PASS**, 119 tests, exit 0; includes 12 enrollment service cases and 2 new credential migration cases |
+| Combined unit/MySQL module collection and execution | **12 PASS**, **6 BLOCKED BY ENVIRONMENT** (pytest skips), exit 0; missing `DATABASE_URL` prevents all real-MySQL cases |
+| Scoped Ruff check | **PASS**, 7 Python files, exit 0 |
+| Strict mypy | **PASS**, 6 Step 05 Python files, exit 0 |
+| Transaction/security review | **PASS** within inspected code; hash-bearing test assertions changed to fixed diagnostics, then reviewed again with no remaining concrete defect |
+| Final Git status/diff/stat/whitespace inspection | **PASS**, only scoped continuation changes; `git diff --check` reports no whitespace errors |
+
+Unit coverage checks the shared connection and commit-before-return ordering,
+real Argon2 hash verification against captured insert parameters, redaction,
+begin/device-insert/credential-insert/commit failure mapping, rollback behavior
+at the service boundary, invalid bootstrap/identity, issuance failure, and UTC
+and post-lock clock handling. Doubles do not prove database atomicity.
+
+The six MySQL cases cover success and replay rejection, four simultaneous
+consumers with exactly one winner, rollback after each real insert, expiry
+advancing while a row lock is awaited, and revision downgrade/upgrade plus
+database key/lifecycle constraints. They require an empty, dedicated disposable
+MySQL 8.x database, protected `DATABASE_URL`, `DEVICE_WATCH_ENV=test`, and
+`DEVICE_WATCH_DISPOSABLE_DATABASE=1`. The fixture refuses unknown schemas,
+revisions, views, and pre-existing rows before mutation. It cleans only its
+test rows and leaves revision `20260913_0004` installed. Docker/MySQL commands
+were unavailable when checked in this session; no unrelated installation or
+infrastructure repair was attempted. Skips are not database PASS evidence.
+
+Intermediate failures were resolved within scope: the bootstrap test followed
+the moving migration head, duplicate unit/integration module names blocked
+combined mypy, and the new integration module needed four type annotations and
+import ordering. The earlier full-server logging annotation finding remains
+outside scope and was not repaired, rerun, or relabeled. No full-server quality
+gate is claimed.
+
+Full Step 05 acceptance still requires the real-MySQL checks above; retain its
+Pending matrix status and the Step 03 persistence evidence block. The next
+permitted continuation is that outstanding verification in a suitable
+environment. Step 06 remains unstarted and requires a separate explicit request
+and review of these prerequisites. No HTTP endpoint, agent enrollment,
+heartbeat, connectivity, metric, or frontend behavior was added. No commit or
+branch change was made by the agent. Stop after this handoff.
