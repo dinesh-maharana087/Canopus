@@ -85,7 +85,7 @@ Health-only Stage 1 routes remain available; the existing app factory/lifespan r
 
 ## Current Handoff
 
-[Step 06](06-enrollment-api.md) is complete at the API boundary: `POST /api/v1/enrollment` validates the four-field request, returns the five-field `201` contract, and sanitizes validation and service failures without secret echo. API, health/lifecycle regression, logging, Ruff, and strict mypy checks pass. [Step 03](03-bootstrap-provisioning.md) and [Step 05](05-enrollment-service.md) retain their **BLOCKED BY ENVIRONMENT** MySQL verification and Pending statuses; API tests do not prove database atomicity, concurrency, or migration behavior. See the [current progress record](../../../progress/current-status.md) for commands, status codes, and deployment assumptions. Step 07 has not started and requires a separate explicit request.
+[Step 07](07-agent-secure-storage.md) storage implementation exists and Windows filesystem/ACL, agent regression, Ruff, and strict platform type checks pass. Its two POSIX runtime tests are **BLOCKED BY ENVIRONMENT** because Linux/WSL is unavailable; Step 07 remains Pending until the Linux permission/link boundary is verified. [Step 06](06-enrollment-api.md) remains Complete at the API boundary. [Step 03](03-bootstrap-provisioning.md) and [Step 05](05-enrollment-service.md) retain their separate MySQL verification blocks and Pending statuses. See the [current progress record](../../../progress/current-status.md) for storage paths, permissions, invalidation, and evidence. Step 08 has not started and requires a separate explicit request and prerequisite review.
 
 ## Planning Boundary
 

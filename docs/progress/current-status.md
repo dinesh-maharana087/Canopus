@@ -1041,3 +1041,142 @@ Only Step 06 is newly marked Complete. Step 07 requires a separate explicit
 request; no agent storage/enrollment, heartbeat, connectivity, metrics, UI,
 operator/RBAC, listing, or credential-rotation endpoint was started. No commit
 or branch change was made. Stop after this handoff.
+
+## Stage 2 Step 07 Implementation — 2026-09-14
+
+Status: **Implementation present and Windows verified; Linux runtime verification
+BLOCKED BY ENVIRONMENT. Step 07 remains Pending; its definition of done is not
+fully verified across the implemented platforms.** No confirmed implementation
+FAIL remains in this step.
+
+Executed only secure agent identity storage from clean HEAD `e84f2d3`. The
+interrupted inspection/design sessions had no Step 07 source changes; work
+resumed without discarding existing files. Read the execution card, approved
+storage specification, Step 01 identity contracts, current master/status, and
+consolidated Stage 1 baseline. Unchanged server, deployment, frontend, and Stage 1
+historical verification evidence were preserved. Step 03/05 MySQL blocks remain
+unchanged and are not prerequisites for these local file checks.
+
+Configuration and file contract:
+
+- Added `DEVICE_WATCH_AGENT_IDENTITY_PATH`, exposed as
+  `AgentSettings.identity_path`. It requires an absolute local file path;
+  relative/traversing/NUL paths are rejected. Windows also rejects UNC paths,
+  alternate data streams, reserved DOS names, and trailing dots/spaces. Errors
+  do not echo the configured value. No server URL or credential default exists.
+- Default Linux path: `/var/lib/device-watch-agent/identity.json`. Default
+  Windows path: `%LOCALAPPDATA%/DeviceWatch/identity.json`, using the current
+  user's `AppData/Local` directory if that variable is absent. A dedicated
+  service account must own the identity directory. Operators must provision the
+  Linux default directory for that account when `/var/lib` is not writable.
+  Storage can create the immediate private parent when permitted; ancestors
+  must already exist. Existing unsafe directories are rejected, never repaired.
+- `AgentIdentity` validates UUIDv4, the canonical 83-character `dwc_v1_` wire
+  credential, and an aware creation timestamp normalized to UTC. It does not
+  generate identities/credentials or import server code. The frozen carrier's
+  default repr/string hides all fields.
+- The UTF-8 JSON file contains exactly `version`, `device_id`, `credential`, and
+  `created_at`. File version is integer `1`; duplicate/extra/missing fields,
+  boolean/float versions, noncanonical UUID/credential encodings, naive/invalid
+  timestamps, and UTC conversion overflow are rejected. Reads are limited to
+  4,096 bytes with an extra sentinel-byte check, so a valid JSON prefix cannot
+  hide oversized input. No database, metrics, bootstrap material, or backup
+  schema is introduced.
+
+Persistence and transition contract:
+
+- `IdentityStore(path).load()` returns an `AgentIdentity` for a valid protected
+  file, `None` only for missing storage, and the generic
+  `IdentityError("Identity storage unavailable")` for malformed/unsafe storage.
+  It creates no directories during reads and retains no cached credential.
+- `save(identity)` validates existing storage before replacement. It creates an
+  exclusive, private temporary file in the same directory, writes/flushes/fsyncs
+  it, closes it, then atomically replaces the destination. The previous valid
+  file survives failures before replacement. Cleanup deletes only a temporary
+  file created by that attempt, including on simulated fsync/replace failure;
+  an exclusive-create collision never deletes an existing file.
+- Only the configured final filename is read. No backup or fallback copy is
+  maintained. A process killed before replacement can leave a protected
+  temporary file; it is never treated as an enrolled identity. The helper does
+  not sweep unrelated temporary files. One writer per identity path is the
+  supported agent usage contract.
+- `invalidate()` checks protected storage, deletes the file without making a
+  backup, and returns `IdentityState.REENROLLMENT_REQUIRED`. The future caller
+  must discard its in-memory identity and stop authenticated sends. Failure to
+  delete raises the same generic storage error and must also fail closed.
+  Missing storage makes this transition idempotent. Deletion is ordinary file
+  removal, not a promise of forensic erasure or remote credential revocation.
+  No automatic enrollment or HTTP-status handler is added in this step.
+
+Permission behavior:
+
+- POSIX: require the current effective user to own the immediate directory with
+  mode `0700` and the regular, single-link file with mode `0600`. Traverse using
+  directory descriptors and `O_NOFOLLOW`, rejecting untrusted writable ancestors
+  except root-owned sticky traversal directories such as `/tmp`. File reads use
+  descriptor checks and nonblocking open so special files cannot hang the
+  reader. Replacement/deletion use the held parent descriptor; directory fsync
+  follows committed updates. Linux execution remains unverified here.
+- Windows: use standard-library `ctypes` and native security APIs. New
+  directories/files receive an explicit protected owner-only DACL before any
+  plaintext is written. Validate the actual opened object's owner, DACL, file
+  type, reparse attributes, and link count. Reject broad/inherited ACLs, junctions,
+  and hard links. Directory handles pin all ancestors against rename while an
+  operation runs. This does not rely on
+  [Windows `chmod`, which only controls the read-only flag](https://docs.python.org/3.12/library/os.html#os.chmod).
+  The native checks use [GetSecurityInfo](https://learn.microsoft.com/en-us/windows/win32/api/aclapi/nf-aclapi-getsecurityinfo)
+  and replacement uses [MoveFileEx with write-through](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-movefileexw).
+  There is no portable Windows directory-fsync equivalent; deletion durability
+  through power loss is not promised. Same-user processes and privileged
+  administrators remain outside the account-based file protection boundary.
+- A post-replacement durability error can occur after the new file is visible;
+  callers must treat the operation as uncertain and reload before relying on it.
+  No plaintext or raw OS exception is logged by these modules.
+
+Files created or modified:
+
+- `agent/src/device_watch_agent/identity.py`
+- `agent/src/device_watch_agent/_identity_posix.py`
+- `agent/src/device_watch_agent/_identity_windows.py`
+- `agent/src/device_watch_agent/config.py`
+- `agent/tests/test_identity.py`
+- `agent/tests/test_identity_windows.py`
+- `docs/progress/current-status.md`
+- `docs/superpowers/plans/2026-09-08-device-watch-stage-2/00-master-index.md`
+
+Verification used the existing server test-tool interpreter because no agent
+virtual environment exists. `PYTHONPATH` points exclusively at the agent source
+for these commands; no server runtime dependency is imported or added to the
+agent. Agent runtime dependencies remain empty, with pyproject/lock unchanged.
+
+```powershell
+$env:PYTHONPATH=(Join-Path (Get-Location) 'agent/src')
+& server/.venv/Scripts/python.exe -B -m pytest agent/tests -q --tb=short -rs
+& server/.venv/Scripts/python.exe -B -m ruff check agent/src/device_watch_agent agent/tests
+& server/.venv/Scripts/python.exe -B -m mypy --config-file agent/pyproject.toml agent/src/device_watch_agent agent/tests/test_identity.py agent/tests/test_identity_windows.py
+& server/.venv/Scripts/python.exe -B -m mypy --platform linux --config-file agent/pyproject.toml agent/src/device_watch_agent/identity.py agent/src/device_watch_agent/_identity_posix.py agent/src/device_watch_agent/config.py agent/tests/test_identity.py
+```
+
+| Check | Result |
+| --- | --- |
+| Agent pytest suite | **PASS**, 69 tests: 31 shared storage/configuration, 11 native Windows ACL/filesystem, and 27 existing agent tests; 2 POSIX skips remain blocked, exit 0 |
+| Agent Ruff | **PASS**, source and tests, exit 0 |
+| Native Windows strict mypy | **PASS**, 14 source/test files, exit 0 |
+| Linux-platform strict mypy | **PASS**, 4 files, exit 0; static typing does not prove Linux filesystem behavior |
+| Security review and focused regressions | **PASS** within reviewed scope; oversized JSON-prefix acceptance and UTC timestamp overflow reproduced and corrected |
+| Linux/POSIX permissions, ownership, symlink/FIFO runtime tests | **BLOCKED BY ENVIRONMENT**, 2 tests skipped; `wsl.exe --list --quiet` exited 1 because WSL is not installed; Docker was unavailable; no installation attempted |
+| Final Git status/diff/stat/whitespace checks | **PASS**, only the eight scoped files changed; historical Stage 1 evidence and agent dependency files unchanged |
+
+The first new tests failed on missing modules. Native Windows tests also caught
+and verified a fix for metadata-only directory handles failing to prevent
+rename. Final tests cover restart, exact schema, malformed/oversized data,
+canonical formats, timezone bounds, private ACLs, link/junction rejection,
+interrupted writes, exclusive creation, deletion/invalidation, and the unchanged
+agent lifecycle/collector behavior. Permission-unsafe or malformed storage
+returns no usable identity; no authenticated transport exists in this slice.
+
+Step 07 implementation is ready for its outstanding Linux verification; retain
+Pending until that runtime permission boundary is checked. Step 08 requires a
+separate explicit request and prerequisite review. No agent HTTP enrollment,
+heartbeat, metrics, credential generation, server changes, or local database
+was started. No commit or branch change was made. Stop after this handoff.

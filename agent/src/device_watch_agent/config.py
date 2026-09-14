@@ -4,8 +4,15 @@ from __future__ import annotations
 
 import os
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from math import isfinite
+from pathlib import Path
+
+from device_watch_agent.identity import (
+    IdentityError,
+    default_identity_path,
+    validate_identity_path,
+)
 
 
 class AgentSettingsError(ValueError):
@@ -14,10 +21,11 @@ class AgentSettingsError(ValueError):
 
 @dataclass(frozen=True, slots=True)
 class AgentSettings:
-    """Validated configuration for the Stage 1 agent runtime."""
+    """Validated runtime and protected identity-file configuration."""
 
     mode: str
     interval_seconds: float = 30.0
+    identity_path: Path = field(default_factory=default_identity_path)
 
 
 def load_settings(environ: Mapping[str, str] | None = None) -> AgentSettings:
@@ -28,9 +36,11 @@ def load_settings(environ: Mapping[str, str] | None = None) -> AgentSettings:
         key
         for key in values
         if key.startswith("DEVICE_WATCH_AGENT_")
-        and key not in {
+        and key
+        not in {
             "DEVICE_WATCH_AGENT_MODE",
             "DEVICE_WATCH_AGENT_INTERVAL_SECONDS",
+            "DEVICE_WATCH_AGENT_IDENTITY_PATH",
         }
     )
     if unknown:
@@ -54,7 +64,19 @@ def load_settings(environ: Mapping[str, str] | None = None) -> AgentSettings:
             "DEVICE_WATCH_AGENT_INTERVAL_SECONDS must be a positive number"
         )
 
-    return AgentSettings(mode=mode, interval_seconds=interval)
+    try:
+        raw_path = values.get("DEVICE_WATCH_AGENT_IDENTITY_PATH")
+        path = (
+            default_identity_path(values)
+            if raw_path is None
+            else validate_identity_path(Path(raw_path))
+        )
+    except (IdentityError, ValueError, TypeError):
+        raise AgentSettingsError(
+            "DEVICE_WATCH_AGENT_IDENTITY_PATH must be a safe absolute path"
+        ) from None
+
+    return AgentSettings(mode=mode, interval_seconds=interval, identity_path=path)
 
 
 __all__ = ["AgentSettings", "AgentSettingsError", "load_settings"]
