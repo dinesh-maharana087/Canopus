@@ -14,7 +14,7 @@ Stage 2 adds enrollment, device identity, authenticated minimal heartbeats, and 
 | 06 | Enrollment API contract and endpoint | 05 | Complete |
 | 07 | Agent secure identity storage | Stage 1 agent | Pending |
 | 08 | Agent enrollment client | 06, 07 | Complete |
-| 09 | Heartbeat protocol contracts and idempotency | 01, 04 | Pending |
+| 09 | Heartbeat protocol contracts and idempotency | 01, 04 | Complete |
 | 10 | Current connectivity-state migration | 02, 09 | Pending |
 | 11 | Authenticated heartbeat service and API | 04, 09, 10 | Pending |
 | 12 | Agent heartbeat sender and retry policy | 07, 09, 11 | Pending |
@@ -85,7 +85,9 @@ Health-only Stage 1 routes remain available; the existing app factory/lifespan r
 
 ## Current Handoff
 
-[Step 08](08-agent-enrollment-client.md) is Complete at the explicit enrollment-client boundary: HTTPS enrollment, bounded connection retries, response validation, protected storage handoff, restart without replay, and cancellation are covered by focused tests. It was explicitly authorized against the existing Step 07 implementation while retaining Step 07's verification-pending status. [Step 07](07-agent-secure-storage.md) remains Pending with its existing Linux/POSIX runtime evidence block; its verification was not reopened. [Step 06](06-enrollment-api.md) remains Complete at the API boundary. [Step 03](03-bootstrap-provisioning.md) and [Step 05](05-enrollment-service.md) retain their separate MySQL verification blocks and Pending statuses. See the [current progress record](../../../progress/current-status.md) for the Step 08 command, configuration, state machine, dependency, and focused evidence. Step 09 has not started.
+[Step 09](09-heartbeat-contracts.md) is Complete at the contract boundary: the existing v1 models, sanitized parsers, and pure idempotency decisions passed 83 focused heartbeat/domain tests. Its execution card records JSON schemas, strict compatibility rules, latest-ID retention per device, and monotonic server receipt semantics. No heartbeat route, migration, persistence, or sender was added. Step 10 remains Pending and was not started.
+
+[Step 08](08-agent-enrollment-client.md) remains Complete at the explicit enrollment-client boundary. It was explicitly authorized against the existing Step 07 implementation while retaining Step 07's verification-pending status. [Step 07](07-agent-secure-storage.md) remains Pending with its existing Linux/POSIX runtime evidence block; its verification was not reopened. [Step 06](06-enrollment-api.md) remains Complete at the API boundary. [Step 03](03-bootstrap-provisioning.md) and [Step 05](05-enrollment-service.md) retain their separate MySQL verification blocks and Pending statuses. See the [current progress record](../../../progress/current-status.md) for focused evidence and the preserved earlier handoffs.
 
 ## Planning Boundary
 

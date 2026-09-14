@@ -1293,3 +1293,70 @@ remain unchanged. The initial Step 07 identity source/test hashes were preserved
 No Step 07 tests, repository-wide suite, broad review, or Step 09 work was run.
 Existing work was preserved, including externally recorded commit `f537b0d`
 during this session; the agent made no commit or branch change. Stop here.
+
+## Stage 2 Step 09 Completion — 2026-09-14
+
+Status: **Complete at the heartbeat-contract boundary; Step 09 definition of done
+satisfied.** Resumed clean HEAD `43f5f54` (`stage02: wip step 09`). That commit
+already contained the Step 09 source and tests, while the master index still
+said Pending and the preceding handoff said it had not started. Those labels
+were stale; fresh focused verification and this handoff establish current status.
+Existing implementation and earlier completed work were preserved without
+source changes, commits, or branch changes.
+
+The existing implementation defines exact minimal v1 request/response models,
+strict versions and UUID/timestamp validation, forbidden extra fields, sanitized
+parsers/failure responses, and a pure current-state decision. A duplicate of the
+latest submission ID preserves all stored fields. A different ID updates only
+latest submission/version and monotonic server-derived last-seen. Observation
+time is diagnostic only. Retention is one latest ID per device, with no TTL or
+history; older IDs outside that slot are treated as new. Acknowledgements report
+this attempt's receipt time. Authentication and atomic application remain caller
+obligations for later steps.
+
+The [Step 09 execution card](../superpowers/plans/2026-09-08-device-watch-stage-2/09-heartbeat-contracts.md)
+now records all three JSON schemas, compatibility/normalization rules, retention
+limits, response semantics, and the server/agent handoff. No agent dependency or
+contract module is needed to consume these language-independent wire rules.
+
+Files changed in this resume session:
+
+- `docs/superpowers/plans/2026-09-08-device-watch-stage-2/09-heartbeat-contracts.md`
+- `docs/superpowers/plans/2026-09-08-device-watch-stage-2/00-master-index.md`
+- `docs/progress/current-status.md`
+
+Preserved implementation verified: `server/src/device_watch_server/domain/contracts.py`,
+`server/src/device_watch_server/domain/heartbeat.py`,
+`server/tests/unit/test_heartbeat_contracts.py`, and
+`server/tests/unit/test_stage2_domain_contracts.py`.
+
+Focused verification (repository root):
+
+```powershell
+$env:PYTHONPATH=(Join-Path (Get-Location) 'server/src')
+& server/.venv/Scripts/python.exe -B -m pytest server/tests/unit/test_heartbeat_contracts.py server/tests/unit/test_stage2_domain_contracts.py -q --tb=short -p no:cacheprovider
+```
+
+- **PASS**, 83 tests (76 heartbeat-contract cases and 7 directly affected domain
+  cases), no failures or skips, exit 0. Coverage includes serialization,
+  validation, schemas, forbidden fields, sanitized errors without logging,
+  duplicate-ID handling, latest-slot/device scoping, and monotonic timestamps.
+- The initial sandbox invocation could not reach the venv's base interpreter.
+  The identical focused command passed with approved host access to the existing
+  interpreter. No interpreter, dependency, or infrastructure was installed or
+  repaired; no environment block remains for Step 09.
+- **PASS**, bounded independent static review of only heartbeat/domain contracts
+  and their tests: no concrete Step 09 acceptance blocker. This does not claim
+  authentication, database, transport, or later-step runtime verification.
+- **PASS**, all three documented JSON schemas parsed and matched generated model
+  structural schemas exactly, after omitting annotations and inlining the status
+  enum. The card requires no Ruff/mypy command; no broader static or test suite
+  was run.
+- **PASS**, `git diff --check`; final status/stat/diff inspection found only the
+  three intended documentation changes and no source or test modifications.
+
+Blockers: **None for Step 09**. Out-of-scope findings: **None newly identified**.
+The inherited Steps 03/05 MySQL and Step 07 Linux evidence blocks remain unchanged
+and do not block this pure contract step. No previous-step verification area was
+reopened. No route, migration, persistence, sender, retry implementation, metrics,
+history, collector, or UI behavior was added. Step 10 remains Pending. Stop here.
