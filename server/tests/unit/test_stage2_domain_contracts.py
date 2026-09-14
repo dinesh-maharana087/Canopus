@@ -83,11 +83,15 @@ def test_summary_is_an_allowlisted_connectivity_contract() -> None:
         "agent_version": "0.2.0",
         "connectivity": ConnectivityState.ONLINE,
     }
-    assert not {"credential", "credential_hash", "bootstrap_secret", "metrics"} & payload.keys()
+    assert (
+        not {"credential", "credential_hash", "bootstrap_secret", "metrics"}
+        & payload.keys()
+    )
 
 
 def test_heartbeat_is_minimal_versioned_and_uses_aware_observation_time() -> None:
     heartbeat = HeartbeatRequest(
+        protocol_version=1,
         submission_id=SUBMISSION_ID,
         agent_version=" 0.2.0 ",
         observed_at=UTC_NOW,
@@ -112,6 +116,7 @@ def test_heartbeat_is_minimal_versioned_and_uses_aware_observation_time() -> Non
 
     with pytest.raises(ValidationError, match="Extra inputs"):
         HeartbeatRequest(
+            protocol_version=1,
             submission_id=SUBMISSION_ID,
             agent_version="0.2.0",
             cpu_percent=10,
@@ -155,7 +160,9 @@ def test_stage2_state_enums_are_explicit_and_immutable() -> None:
     }
     assert HeartbeatStatus.ACCEPTED.value == "accepted"
 
-    heartbeat = HeartbeatRequest(submission_id=SUBMISSION_ID, agent_version="0.2.0")
+    heartbeat = HeartbeatRequest(
+        protocol_version=1, submission_id=SUBMISSION_ID, agent_version="0.2.0"
+    )
     with pytest.raises(ValidationError):
         heartbeat.agent_version = "changed"  # type: ignore[misc]
 
