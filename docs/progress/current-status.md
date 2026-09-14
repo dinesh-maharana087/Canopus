@@ -1360,3 +1360,99 @@ The inherited Steps 03/05 MySQL and Step 07 Linux evidence blocks remain unchang
 and do not block this pure contract step. No previous-step verification area was
 reopened. No route, migration, persistence, sender, retry implementation, metrics,
 history, collector, or UI behavior was added. Step 10 remains Pending. Stop here.
+
+## Stage 2 Step 10 Implementation — 2026-09-14
+
+Status: **Implemented; required real-MySQL verification BLOCKED BY ENVIRONMENT**.
+Step 10 remains **Pending** in the master index. Its database definition of done
+is not claimed complete. Resumed clean HEAD `aa275d7` and preserved all prior
+source, migrations, tests, and completed-step evidence. No commit or branch change.
+
+Added revision **`20260914_0005`**, revising **`20260913_0004`**, in
+`server/alembic/versions/20260914_0005_current_connectivity.py`. It adds only
+nullable `devices.last_seen_at DATETIME(6)`,
+`devices.last_heartbeat_submission_id VARCHAR(36)`, and
+`devices.last_agent_version VARCHAR(64)`, with no defaults or automatic updates.
+Server receipt times use UTC without timezone metadata and retain microseconds.
+The existing device primary key provides one current-state tuple per device;
+there is no new table, foreign key, or global submission-ID uniqueness.
+
+`ck_devices_submission_requires_last_seen` enforces a non-null receipt timestamp
+when a submission ID is present. `ix_devices_last_seen_at` is a nonunique index.
+Retention follows Step 09: only the latest ID per device until replaced, with no
+TTL or history. No observation time, derived status, credentials/hashes, raw
+heartbeat bodies, metrics, or other later-stage storage was added.
+
+The separate Core projection in `db/connectivity.py` maps the same physical
+`devices` table's key/current-state columns. The original enrollment projection
+remains unchanged so earlier revision-pinned consumers still select only identity
+columns. This avoids a compatibility problem identified during the bounded review
+of the initial metadata approach; no earlier-step test or implementation needed
+repair. Alembic remains the schema owner; no service, ORM lifecycle, or update
+behavior was introduced.
+
+Migration evidence:
+
+- **PASS**, offline MySQL `0004 -> 0005` emits only three added columns, the
+  check constraint, and the index. `0005 -> 0004` drops index/check before those
+  columns and preserves existing tables. Downgrade loses only the Step 10 current
+  values; re-upgrade initializes them to null.
+- **PASS**, offline `0002 -> 0005` and `0005 -> 0002` traverse the existing
+  0003/0004 revisions without branching or dropping device identity storage.
+  The single Step 10 revision does not remove prerequisite tables.
+- **PASS**, new metadata compiles to MySQL `DATETIME(6)`/bounded strings with the
+  matching check/index. Enrollment SQL retains its identity-only projection.
+- **BLOCKED BY ENVIRONMENT**, live MySQL schema inspection, constraint rejection,
+  timestamp precision, and data-preserving round trips. `DATABASE_URL` is absent;
+  Docker is unavailable. Availability was established once without disclosing
+  configuration values. No infrastructure was installed or repaired.
+
+Files added:
+
+- `server/alembic/versions/20260914_0005_current_connectivity.py`
+- `server/src/device_watch_server/db/connectivity.py`
+- `server/tests/unit/test_connectivity_migration.py`
+- `server/tests/integration/test_connectivity_migration_mysql.py`
+
+Documentation updated:
+
+- `docs/superpowers/plans/2026-09-08-device-watch-stage-2/10-connectivity-migration.md`
+- `docs/superpowers/plans/2026-09-08-device-watch-stage-2/00-master-index.md`
+- `docs/progress/current-status.md`
+
+Focused verification (repository root, existing interpreter with host access):
+
+```powershell
+$env:PYTHONPATH=(Join-Path (Get-Location) 'server/src')
+& server/.venv/Scripts/python.exe -B -m pytest server/tests/unit/test_connectivity_migration.py server/tests/integration/test_connectivity_migration_mysql.py -q --tb=short -rs -p no:cacheprovider
+& server/.venv/Scripts/python.exe -B -m ruff check server/alembic/versions/20260914_0005_current_connectivity.py server/src/device_watch_server/db/connectivity.py server/tests/unit/test_connectivity_migration.py server/tests/integration/test_connectivity_migration_mysql.py
+& server/.venv/Scripts/python.exe -B -m mypy --config-file server/pyproject.toml --cache-dir .tmp/step10-mypy server/alembic/versions/20260914_0005_current_connectivity.py server/src/device_watch_server/db/connectivity.py server/tests/unit/test_connectivity_migration.py server/tests/integration/test_connectivity_migration_mysql.py
+```
+
+| Check | Result |
+| --- | --- |
+| Focused pytest | **6 passed, 1 skipped**, exit 0; MySQL skip is classified BLOCKED, not PASS |
+| Scoped Ruff | **PASS** |
+| Strict mypy | **PASS**, 4 source/test files |
+| Bounded migration/model/test review | **PASS**, no remaining implementation defect |
+
+The first five unit tests failed on the missing revision/columns before
+implementation. Final tests cover the migration chain, exact current-state DDL,
+downgrade, no added history tables, and projection compatibility. Static checking
+also corrected the new test module naming and timestamp/result typing. No
+unrelated suite or prior-step verification area was run.
+
+To finish the blocked evidence, run only the new MySQL integration module against
+a dedicated empty disposable MySQL 8.x database (or empty baseline/Step 02 schema)
+with `DEVICE_WATCH_ENV=test`, `DEVICE_WATCH_DISPOSABLE_DATABASE=1`, and protected
+`DATABASE_URL`. The test refuses unexpected schema, views, revisions, or existing
+device rows, seeds/deletes only synthetic identities, and finishes at Step 02.
+It checks null initialization, microsecond durability, check/PK enforcement,
+same submission UUID across devices, replacement without history, and identity
+preservation through `0005/0004/0002` round trips. Live migration/constraint
+verification has not occurred; no live database was changed.
+
+Blockers: the required **real-MySQL Step 10 evidence** above. Out-of-scope findings:
+**None newly identified**. The inherited Steps 03/05 MySQL and Step 07 Linux blocks
+remain unchanged. No heartbeat API/service, evaluator, sender, retry policy,
+metrics, alerts, or UI was implemented. Step 11 remains Pending. Stop here.

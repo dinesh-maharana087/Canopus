@@ -85,7 +85,9 @@ Health-only Stage 1 routes remain available; the existing app factory/lifespan r
 
 ## Current Handoff
 
-[Step 09](09-heartbeat-contracts.md) is Complete at the contract boundary: the existing v1 models, sanitized parsers, and pure idempotency decisions passed 83 focused heartbeat/domain tests. Its execution card records JSON schemas, strict compatibility rules, latest-ID retention per device, and monotonic server receipt semantics. No heartbeat route, migration, persistence, or sender was added. Step 10 remains Pending and was not started.
+[Step 10](10-connectivity-migration.md) is implemented with revision `20260914_0005` following `20260913_0004`, adding only current connectivity columns, a check, and a nonunique index on `devices`. Six focused offline migration/metadata tests, scoped Ruff/mypy, and bounded review passed. The real-MySQL schema/constraint/round-trip test is **BLOCKED BY ENVIRONMENT** because no test database is configured; Step 10 remains **Pending** until that required evidence passes. Step 11 remains Pending and was not started.
+
+[Step 09](09-heartbeat-contracts.md) remains Complete at the contract boundary. Its minimal v1 schemas, latest-ID retention per device, and monotonic server receipt semantics are preserved; its verification was not reopened.
 
 [Step 08](08-agent-enrollment-client.md) remains Complete at the explicit enrollment-client boundary. It was explicitly authorized against the existing Step 07 implementation while retaining Step 07's verification-pending status. [Step 07](07-agent-secure-storage.md) remains Pending with its existing Linux/POSIX runtime evidence block; its verification was not reopened. [Step 06](06-enrollment-api.md) remains Complete at the API boundary. [Step 03](03-bootstrap-provisioning.md) and [Step 05](05-enrollment-service.md) retain their separate MySQL verification blocks and Pending statuses. See the [current progress record](../../../progress/current-status.md) for focused evidence and the preserved earlier handoffs.
 
