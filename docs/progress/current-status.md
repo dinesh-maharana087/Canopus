@@ -1180,3 +1180,116 @@ Pending until that runtime permission boundary is checked. Step 08 requires a
 separate explicit request and prerequisite review. No agent HTTP enrollment,
 heartbeat, metrics, credential generation, server changes, or local database
 was started. No commit or branch change was made. Stop after this handoff.
+
+## Stage 2 Step 08 Completion — 2026-09-14
+
+Status: **Complete at the agent enrollment-client boundary.** The current user
+explicitly authorized Step 08 using the existing Step 07 implementation, with
+Step 07 remaining verification-pending. The previous section is the historical
+Step 07 handoff; its Linux/runtime evidence was not reopened or relabeled.
+
+Implemented only outbound enrollment and its configuration, command, and tests:
+
+- `device-watch-agent --enroll` (or `python -m device_watch_agent --enroll`)
+  performs one explicit enrollment action and exits. An existing valid identity
+  is loaded before any network request or requirement for enrollment inputs.
+  Repeating the command after successful persistence therefore sends no POST.
+  Ordinary service startup does not initiate enrollment, even if bootstrap
+  configuration remains present. Do not configure a service supervisor to
+  repeat `--enroll`; the command is an operator action.
+- In addition to the existing `DEVICE_WATCH_AGENT_MODE=service` and identity
+  path, first enrollment requires `DEVICE_WATCH_AGENT_SERVER_URL`,
+  `DEVICE_WATCH_AGENT_BOOTSTRAP_SECRET`, and `DEVICE_WATCH_AGENT_DISPLAY_NAME`.
+  All three default to absent. The URL must be an HTTPS origin, optionally with
+  a trailing slash, without user info, path prefix, query, or fragment. Bootstrap
+  input uses the canonical server wire format and is excluded from settings
+  representations. Display names are nonblank, at most 120 characters, and
+  trimmed consistently with the server. Secrets are not command-line arguments.
+- The client sends exactly `protocol_version`, `bootstrap_secret`,
+  `display_name`, and package-version value `agent_version=0.1.0` to
+  `POST /api/v1/enrollment`. Only a `201` JSON response with the exact five-field
+  response contract is accepted. Version/type, display name, canonical UUIDv4,
+  credential, and aware timestamp validation precede the existing
+  `IdentityStore.save()` atomic handoff. Malformed/unsafe existing storage
+  prevents enrollment. No Step 07 source or tests were changed by this task.
+- Added pinned runtime dependency `httpx==0.28.1` and updated `agent/uv.lock`
+  offline. Existing locked package versions were preserved. HTTPS certificate
+  verification remains enabled; redirects, environment proxies/netrc, and
+  transport-level retries are disabled. The enrollment client controls retries.
+- Connect/pool timeouts are **5 seconds**; read/write timeouts are **10 seconds**.
+  Each network attempt also has a **30-second total deadline**. There are at most
+  **3 attempts**, with **0.5-second and 1-second** cancellable delays, exclusively
+  for connection-establishment errors/timeouts. No HTTP response, read/write
+  failure, protocol failure, or total deadline triggers a replay. Timeout and
+  retry choices follow the [HTTPX timeout](https://www.python-httpx.org/advanced/timeouts/)
+  and [transport](https://www.python-httpx.org/advanced/transports/) contracts.
+
+Enrollment state and shutdown handoff:
+
+- Missing identity starts `UNENROLLED`; missing explicit inputs or exhausted
+  safe connection retries leave it `UNENROLLED` and return a sanitized error.
+- A configured action becomes `ENROLLING`, then `ENROLLED` only after accepting
+  and storing the issued identity. A valid stored identity goes directly to
+  `ENROLLED`, without network traffic.
+- Unsafe/malformed storage, non-201 responses, invalid success responses,
+  uncertain send/read/timeout outcomes, and storage failure after a response
+  move to `REENROLLMENT_REQUIRED`. Further calls on that client cannot replay.
+  There is no automatic restart enrollment or persisted bootstrap/recovery
+  credential. The operator must reconcile a possibly committed enrollment and
+  obtain a fresh bootstrap when necessary; a lost response is not recoverable
+  by retrying this API. The command returns 1 for an enrollment/configuration
+  failure and logs only generic diagnostics and state.
+- Stop signals supported by the existing event-loop handlers cancel and await
+  the pending enrollment operation; cancellation closes the async HTTP client
+  and conservatively requires recovery. Keyboard interruption retains the
+  entry point's clean-exit behavior. Network I/O and retry waits are cancellable;
+  once a response is accepted, the short synchronous atomic storage operation
+  finishes without an intervening await. No collector orchestration or
+  authenticated sender was added.
+
+Files created or modified for Step 08:
+
+- `agent/src/device_watch_agent/transport/__init__.py`
+- `agent/src/device_watch_agent/transport/enrollment.py`
+- `agent/src/device_watch_agent/config.py`
+- `agent/src/device_watch_agent/main.py`
+- `agent/tests/test_enrollment.py`
+- `agent/pyproject.toml`
+- `agent/uv.lock`
+- `docs/progress/current-status.md`
+- `docs/superpowers/plans/2026-09-08-device-watch-stage-2/00-master-index.md`
+
+Focused verification (repository root, existing host-access interpreter):
+
+```powershell
+$env:PYTHONPATH=(Join-Path (Get-Location) 'agent/src')
+$step08Temp=Join-Path '.tmp' ('step08-final-' + [guid]::NewGuid().ToString('N'))
+& server/.venv/Scripts/python.exe -B -m pytest agent/tests/test_enrollment.py agent/tests/test_config.py agent/tests/test_main.py -q --tb=short -p no:cacheprovider --basetemp $step08Temp
+& server/.venv/Scripts/python.exe -B -m ruff check agent/src/device_watch_agent/config.py agent/src/device_watch_agent/main.py agent/src/device_watch_agent/transport agent/tests/test_enrollment.py
+& server/.venv/Scripts/python.exe -B -m mypy --config-file agent/pyproject.toml --cache-dir .tmp/step08-mypy agent/src/device_watch_agent/config.py agent/src/device_watch_agent/main.py agent/src/device_watch_agent/transport agent/tests/test_enrollment.py
+& .tmp/uv-tool/Scripts/uv.exe lock --project agent --check --offline --python 'C:/Users/dkmah/AppData/Local/Programs/Python/Python312/python.exe'
+```
+
+| Check | Result |
+| --- | --- |
+| Step 08 and directly affected pytest | **PASS**, 71 tests: 57 enrollment/configuration/command tests, 13 existing configuration tests, 1 existing signal-wiring test; no skips; exit 0 |
+| Scoped Ruff | **PASS**, Step 08 source and tests |
+| Strict mypy | **PASS**, 5 source/test files; initial dynamic test-field typing errors corrected |
+| Agent lockfile consistency | **PASS**, offline check resolved 21 packages; all six HTTP dependency versions in the test environment match the agent lock |
+| Bounded Step 08 acceptance check | **PASS**, no directly blocking Step 08 defect identified |
+
+The first enrollment test run failed because the transport module was absent;
+the command/shutdown tests then failed on missing entry-point wiring. Final
+tests use fake HTTP server/transport responses and failure traces, with real
+protected storage for the enrollment-to-restart path. They cover exact request
+shape, validation, safe bounded retry exhaustion, no replay after uncertain
+outcomes, redirects/HTTP errors, sanitized logs/errors, storage failure, and
+transport cleanup on cancellation. This evidence does not claim a live
+Caddy/MySQL end-to-end check or Linux permission verification.
+
+No Step 08 blocker remains. No new out-of-scope finding was investigated or
+repaired. The inherited Step 07 Linux evidence gap and Steps 03/05 MySQL blocks
+remain unchanged. The initial Step 07 identity source/test hashes were preserved.
+No Step 07 tests, repository-wide suite, broad review, or Step 09 work was run.
+Existing work was preserved, including externally recorded commit `f537b0d`
+during this session; the agent made no commit or branch change. Stop here.

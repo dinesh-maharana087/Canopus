@@ -365,7 +365,12 @@ def test_no_enrollment_defaults_and_hidden_bootstrap(settings: AgentSettings) ->
 async def test_missing_input_cannot_send(settings: AgentSettings, field: str) -> None:
     from dataclasses import replace
 
-    settings = replace(settings, **{field: None})
+    if field == "server_url":
+        settings = replace(settings, server_url=None)
+    elif field == "bootstrap_secret":
+        settings = replace(settings, bootstrap_secret=None)
+    else:
+        settings = replace(settings, display_name=None)
 
     def unexpected(_: httpx.Request) -> httpx.Response:
         pytest.fail("Enrollment sent without required explicit inputs")
